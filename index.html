@@ -1320,6 +1320,31 @@ async function installFonts(list) {
   if (added) { saveMine(); renderMine(); }
 }
 
+/* ---------- spazio nel browser ---------- */
+let persisted = false;
+async function askPersist() {
+  if (persisted || !navigator.storage || !navigator.storage.persist) return persisted;
+  try { persisted = await navigator.storage.persisted() || await navigator.storage.persist(); } catch (e) {}
+  return persisted;
+}
+const mb = b => b >= 1e9 ? (b / 1e9).toFixed(1).replace('.', ',') + ' GB' : Math.max(0.1, b / 1e6).toFixed(1).replace('.', ',') + ' MB';
+async function spaceHTML(list) {
+  let h = '';
+  try {
+    const e = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+    if (e && e.quota) {
+      const pc = Math.min(100, e.usage / e.quota * 100);
+      h += `<div><div class="row" style="justify-content:space-between"><span>Spazio usato: <b>${mb(e.usage)}</b> su ${mb(e.quota)} disponibili</span><span class="q">${pc < 0.1 ? 'meno dello 0,1' : pc.toFixed(1).replace('.', ',')}%</span></div>
+        <div style="height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.max(1, pc)}%;background:${pc > 80 ? 'var(--bad)' : 'var(--ok)'}"></div></div></div>`;
+    }
+  } catch (err) {}
+  const ok = await askPersist();
+  h += ok
+    ? '<div class="iss ok"><span>🔒 Archivio protetto: il browser non cancella i lavori da solo, nemmeno se il disco si riempie. Si perdono solo cancellando i "dati dei siti".</span></div>'
+    : '<div class="iss warn"><span>⚠ Il browser non ha ancora protetto l\'archivio: se il disco si riempie potrebbe cancellare i lavori. Installa l\'app (pulsante "⤓ Installa app") o aggiungi il sito ai preferiti: di solito basta perché il browser la protegga. Intanto usa ogni tanto "💾 Salva progetto".</span></div>';
+  return h;
+}
+
 /* ---------- I miei lavori (salvati nel browser) ---------- */
 let work = null, saveTimer = null, dirty = false;
 function unsaved() { return dirty && assets.length > 0; }
@@ -1347,7 +1372,7 @@ async function saveNow(manual) {
   try {
     const data = snapshot(); data.fonts = await usedFonts();
     await idb('lavori', 'put', work.id, { id: work.id, name: work.name, created: work.created, updated: Date.now(), thumb: thumbOf(), n: placements.length, data });
-    localStorage.setItem('fs-ultimo', work.id); dirty = false;
+    localStorage.setItem('fs-ultimo', work.id); dirty = false; askPersist();
   } catch (e) { console.error(e); $('#saveState').textContent = '⚠ Non salvato (spazio pieno?)'; return; }
   workUI();
 }
@@ -1386,15 +1411,15 @@ async function renameWork() {
 $('#workName').onclick = renameWork;
 async function worksDialog() {
   if (unsaved()) await saveNow();
-  const list = (await idb('lavori', 'all').catch(() => [])).sort((a, b) => b.updated - a.updated);
+  const list = (await idb('lavori', 'all').catch(() => [])).sort((a, b) => b.updated - a.updated), space = await spaceHTML(list);
   const row = w => `<div class="work ${work && work.id === w.id ? 'cur' : ''}" data-id="${esc(w.id)}">
       ${w.thumb ? `<img src="${w.thumb}" alt="">` : '<img alt="">'}
-      <div class="wi"><b>${esc(w.name)}</b><span class="q">${new Date(w.updated).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} · ${w.n || 0} pezzi${work && work.id === w.id ? ' · aperto adesso' : ''}</span></div>
+      <div class="wi"><b>${esc(w.name)}</b><span class="q">${new Date(w.updated).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} · ${w.n || 0} pezzi · ${mb(JSON.stringify(w.data || {}).length + (w.thumb || '').length)}${work && work.id === w.id ? ' · aperto adesso' : ''}</span></div>
       <button class="small primary" data-a="open">Apri</button><button class="small" data-a="ren">Rinomina</button><button class="small" data-a="dup">Duplica</button><button class="small" data-a="del" title="Elimina">🗑</button>
     </div>`;
   dialog({
     title: 'I miei lavori', wide: true,
-    html: `<div class="q">I lavori si salvano da soli mentre lavori, su questo computer. Per tenerne una copia altrove usa "💾 Salva progetto".</div>
+    html: `<div class="q">I lavori si salvano da soli mentre lavori, su questo computer. Per tenerne una copia altrove usa "💾 Salva progetto".</div>${space}
       ${list.length ? list.map(row).join('') : '<div class="empty">Nessun lavoro salvato.</div>'}`,
     buttons: [{ label: '＋ Nuovo lavoro', value: 'new' }, { label: 'Chiudi', primary: true, value: null }],
     onOpen: body => body.onclick = async e => {
@@ -1625,7 +1650,7 @@ $('#btnShirt').onclick = () => openShirt();
   const last = localStorage.getItem('fs-ultimo');
   if (last) { try { await loadWork(last); } catch (e) { console.warn(e); } }
   if (hIdx < 0) histReset();
-  workUI();
+  workUI(); askPersist();
 })();
 </script>
 </body>

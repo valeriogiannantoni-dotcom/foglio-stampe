@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foglio Stampe</title>
+<meta name="theme-color" content="#c2410c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Lobster&family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Oswald:wght@400;700&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Poppins:ital,wght@0,400;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --bg:#f3f0ec; --panel:#ffffff; --ink:#24211e; --muted:#6f6a64; --line:#e3ddd6;
+  --accent:#c2410c; --accent-soft:#fdeee6; --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:14px/1.45 "Poppins",system-ui,sans-serif;color:var(--ink);background:var(--bg);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+header{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:18px;margin:0 auto 0 0;font-weight:700;letter-spacing:.2px}
+header h1 span{color:var(--accent)}
+.app{display:grid;grid-template-columns:390px 1fr;min-height:0}
+aside{overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:14px 14px 40px}
+main{display:grid;grid-template-rows:auto auto 1fr;min-height:0}
+section{margin-bottom:18px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:0 0 8px;font-weight:600}
+label{display:block;font-size:12px;color:var(--muted)}
+input[type=number],input[type=text],select,textarea{font:inherit;font-size:14px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{resize:vertical;min-height:52px}
+input[type=color]{width:42px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:#fff}
+button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:#bdb4aa}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button.big{width:100%;padding:11px;font-size:15px}
+button.small{padding:4px 9px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 80px;gap:8px}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);cursor:pointer}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:6px;cursor:pointer;font-size:13px;color:var(--ink)}
+.seg input{display:none}
+.seg label:has(input:checked){background:var(--accent-soft);color:var(--accent);font-weight:600}
+.help{background:var(--accent-soft);border-radius:10px;padding:10px 12px;font-size:13px}
+.help summary{cursor:pointer;font-weight:600;color:var(--accent)}
+.help ol{margin:8px 0 0;padding-left:18px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:12px;text-align:center;color:var(--muted);font-size:12px;margin-top:8px}
+body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
+.card{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px;display:grid;gap:8px;background:#fff}
+.card.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card .top{display:flex;gap:10px;align-items:center}
+.card canvas.th{width:54px;height:54px;border-radius:8px;flex:none;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px;border:1px solid var(--line)}
+.card .name{flex:1;font-weight:600;font-size:13px;word-break:break-word}
+.card .del{border:none;color:var(--muted);font-size:16px;padding:4px 8px}
+.card .del:hover{color:var(--bad)}
+.q{font-size:12px}
+.q.ok{color:var(--ok)} .q.warn{color:var(--warn)} .q.bad{color:var(--bad);font-weight:600}
+.toolbar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.stats{font-size:13px;color:var(--muted);margin-left:auto}
+.stats b{color:var(--ink)}
+.alert{padding:8px 16px;font-size:13px;display:none}
+.alert.show{display:block}
+.alert.bad{background:#fde8e8;color:var(--bad)}
+.alert.info{background:#fff7e6;color:var(--warn)}
+#viewport{overflow:auto;padding:24px;min-height:0}
+#sheet{display:block;margin:0 auto;box-shadow:0 2px 14px rgba(0,0,0,.18);touch-action:none}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:10px}
+#selbar{display:none;gap:6px;align-items:center;font-size:13px}
+#selbar.show{display:flex}
+#busy{position:fixed;inset:0;background:rgba(30,25,20,.45);display:none;align-items:center;justify-content:center;z-index:10}
+#busy.show{display:flex}
+#busy div{background:#fff;padding:18px 26px;border-radius:12px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Foglio <span>Stampe</span></h1>
+  <button id="btnInstall" class="hidden" title="Installa Foglio Stampe sul computer come un programma">⤓ Installa app</button>
+  <button id="btnOpen" title="Riapri un progetto salvato">📂 Apri progetto</button>
+  <button id="btnSave" title="Salva il lavoro per modificarlo dopo">💾 Salva progetto</button>
+  <button id="btnPng" class="primary" title="File PNG trasparente a 300 dpi">⬇ Esporta PNG</button>
+  <button id="btnPdf" class="primary" title="File PDF a misura reale, immagini a 300 dpi">⬇ Esporta PDF</button>
+  <input type="file" id="fileProject" accept=".json,application/json" class="hidden">
+</header>
+
+<div class="app">
+<aside>
+  <section>
+    <details class="help">
+      <summary>Come si usa</summary>
+      <ol>
+        <li>Carica i loghi (PDF, JPG o PNG) o aggiungi una scritta.</li>
+        <li>Per ogni elemento scrivi la misura in cm e quante copie ti servono.</li>
+        <li>Il foglio si riempie da solo, sprecando meno spazio possibile. Puoi anche trascinare gli elementi a mano.</li>
+        <li>Premi <b>Esporta PNG</b> o <b>Esporta PDF</b> e manda il file alla tipografia.</li>
+        <li>Premi <b>Salva progetto</b> se vuoi riaprirlo dopo.</li>
+      </ol>
+    </details>
+  </section>
+
+  <section>
+    <h2>Foglio</h2>
+    <div class="grid2">
+      <label>Larghezza (cm)<input type="number" id="sheetW" min="10" max="200" step="1" value="56"></label>
+      <label>Lunghezza (cm)<input type="number" id="fixedLen" min="10" max="2000" step="1" value="100"></label>
+    </div>
+    <div class="seg" style="margin-top:8px">
+      <label><input type="radio" name="mode" value="auto" checked> Lunghezza automatica</label>
+      <label><input type="radio" name="mode" value="fixed"> Lunghezza fissa</label>
+    </div>
+    <div class="grid2" style="margin-top:8px">
+      <label>Spazio tra elementi (mm)<input type="number" id="gap" min="0" max="50" step="1" value="5"></label>
+      <label>Margine dai bordi (mm)<input type="number" id="margin" min="0" max="50" step="1" value="5"></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Aggiungi</h2>
+    <div class="grid2">
+      <button class="primary big" id="btnAddFile">＋ Loghi / immagini</button>
+      <button class="big" id="btnAddText">＋ Scritta</button>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="hidden">
+    <div class="drop">…oppure trascina qui i file (PDF, JPG, PNG)</div>
+  </section>
+
+  <section>
+    <h2>Elementi</h2>
+    <div id="list"><div class="empty">Ancora nessun elemento.</div></div>
+  </section>
+</aside>
+
+<main>
+  <div class="toolbar">
+    <button id="btnPack" class="primary">✨ Sistema automaticamente</button>
+    <button id="zoomOut" title="Riduci">−</button>
+    <button id="zoomFit" title="Adatta alla finestra">Adatta</button>
+    <button id="zoomIn" title="Ingrandisci">+</button>
+    <label class="chk"><input type="checkbox" id="bgDark"> Sfondo scuro</label>
+    <div id="selbar">
+      <span id="selName"></span>
+      <button class="small" id="selRot">↻ Ruota (R)</button>
+      <button class="small" id="selDel">🗑 Togli copia (Canc)</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="alert" id="alert"></div>
+  <div id="viewport"><canvas id="sheet"></canvas></div>
+</main>
+</div>
+<div id="busy"><div id="busyMsg">Attendere…</div></div>
+
+<script>
+'use strict';
+const PXMM = 300 / 25.4;               // pixel per mm a 300 dpi
+const $ = s => document.querySelector(s);
+const S = { sheetW: 560, mode: 'auto', fixedLen: 1000, gap: 5, margin: 5 }; // tutto in mm
+let assets = [], placements = [], unplaced = 0, nextId = 1, sel = -1, zoom = 1, bgDark = false, badSet = new Set();
+const FONTS = ['Montserrat','Poppins','Oswald','Anton','Bebas Neue','Playfair Display','Dancing Script','Pacifico','Great Vibes','Lobster','Arial','Georgia','Times New Roman'];
+
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- utilità canvas ---------- */
+function mk(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+function resizeHQ(src, w, h) {
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  let cur = src;
+  while (cur.width / 2 >= w && cur.height / 2 >= h) {
+    const n = mk(cur.width / 2, cur.height / 2), x = n.getContext('2d');
+    x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, n.width, n.height); cur = n;
+  }
+  const o = mk(w, h), ox = o.getContext('2d');
+  ox.imageSmoothingQuality = 'high'; ox.drawImage(cur, 0, 0, w, h);
+  return o;
+}
+function rot90(c) { const o = mk(c.height, c.width), x = o.getContext('2d'); x.translate(o.width, 0); x.rotate(Math.PI / 2); x.drawImage(c, 0, 0); return o; }
+function trimCanvas(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d').getImageData(0, 0, W, H).data;
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) {
+    const row = y * W * 4;
+    for (let x = 0; x < W; x++) if (d[row + x * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+  }
+  if (x1 < 0 || (x0 === 0 && y0 === 0 && x1 === W - 1 && y1 === H - 1)) return c;
+  const o = mk(x1 - x0 + 1, y1 - y0 + 1); o.getContext('2d').drawImage(c, -x0, -y0); return o;
+}
+// colore dello sfondo = colore più comune lungo i bordi (null se i bordi sono già trasparenti)
+function borderColor(d, W, H) {
+  const r = [], g = [], b = []; let n = 0;
+  const st = Math.max(1, Math.floor((W + H) / 2000));
+  const add = i => { n++; const k = i * 4; if (d[k + 3] > 200) { r.push(d[k]); g.push(d[k + 1]); b.push(d[k + 2]); } };
+  for (let x = 0; x < W; x += st) { add(x); add((H - 1) * W + x); }
+  for (let y = 0; y < H; y += st) { add(y * W); add(y * W + W - 1); }
+  if (r.length < n * 0.5) return null;
+  const med = a => a.sort((p, q) => p - q)[a.length >> 1];
+  return [med(r), med(g), med(b)];
+}
+// guarda i bordi e decide come togliere lo sfondo: bianco pulito -> solo intorno, carta/texture -> tutto, con sensibilità adatta
+function autoBackground(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d').getImageData(0, 0, W, H).data, bg = borderColor(d, W, H);
+  if (!bg) return { bg: 'none', tol: 40 };
+  const ds = [], st = Math.max(1, Math.floor((W + H) / 2000));
+  const add = i => { const k = i * 4; ds.push(Math.sqrt((d[k] - bg[0]) ** 2 + (d[k + 1] - bg[1]) ** 2 + (d[k + 2] - bg[2]) ** 2)); };
+  for (let x = 0; x < W; x += st) { add(x); add((H - 1) * W + x); }
+  for (let y = 0; y < H; y += st) { add(y * W); add(y * W + W - 1); }
+  ds.sort((p, q) => p - q);
+  const noise = ds[Math.floor(ds.length * 0.9)];
+  const cleanWhite = Math.min(...bg) >= 245 && noise < 6;
+  return { bg: cleanWhite ? 'outer' : 'all', tol: Math.round(Math.max(30, Math.min(90, 25 + noise * 3))) };
+}
+// toglie lo sfondo (bianco, carta, colore uniforme): tol = sensibilità, outerOnly = solo quello collegato ai bordi
+function removeBackground(c, tol, outerOnly) {
+  const ctx = c.getContext('2d'), W = c.width, H = c.height, N = W * H, id = ctx.getImageData(0, 0, W, H), d = id.data;
+  const bg = borderColor(d, W, H), t2 = tol * tol;
+  const dist2 = k => bg ? (d[k] - bg[0]) ** 2 + (d[k + 1] - bg[1]) ** 2 + (d[k + 2] - bg[2]) ** 2 : 1e9;
+  const isBg = i => { const k = i * 4; return d[k + 3] < 10 || dist2(k) < t2; };
+  const mark = new Uint8Array(N), q = new Int32Array(N); // mark: 1 visto, 2 sfondo
+  if (!outerOnly) { for (let i = 0; i < N; i++) if (isBg(i)) mark[i] = 2; }
+  else {
+    let sp = 0;
+    const push = i => { if (!mark[i]) { if (isBg(i)) { mark[i] = 2; q[sp++] = i; } else mark[i] = 1; } };
+    for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+    while (sp) {
+      const i = q[--sp], x = i % W;
+      if (x > 0) push(i - 1); if (x < W - 1) push(i + 1); if (i >= W) push(i - W); if (i < N - W) push(i + W);
+    }
+  }
+  for (let i = 0; i < N; i++) if (mark[i] === 2) d[i * 4 + 3] = 0;
+  // bordi morbidi: i pixel al confine simili allo sfondo diventano semi-trasparenti
+  if (bg) for (let i = 0; i < N; i++) {
+    if (mark[i] === 2) continue; const x = i % W;
+    if ((x > 0 && mark[i - 1] === 2) || (x < W - 1 && mark[i + 1] === 2) || (i >= W && mark[i - W] === 2) || (i < N - W && mark[i + W] === 2)) {
+      const k = i * 4, dd = Math.sqrt(dist2(k));
+      if (dd < tol * 2) d[k + 3] = Math.min(d[k + 3], Math.round(255 * (dd - tol) / tol));
+    }
+  }
+  // toglie i puntini isolati rimasti (granelli della carta, sporco della scansione)
+  const minArea = Math.max(30, Math.round(N * 0.00002));
+  mark.fill(0);
+  for (let s = 0; s < N; s++) {
+    if (mark[s] || d[s * 4 + 3] === 0) continue;
+    let h = 0, t = 0; q[t++] = s; mark[s] = 1;
+    while (h < t) {
+      const i = q[h++], x = i % W;
+      if (x > 0 && !mark[i - 1] && d[(i - 1) * 4 + 3]) { mark[i - 1] = 1; q[t++] = i - 1; }
+      if (x < W - 1 && !mark[i + 1] && d[(i + 1) * 4 + 3]) { mark[i + 1] = 1; q[t++] = i + 1; }
+      if (i >= W && !mark[i - W] && d[(i - W) * 4 + 3]) { mark[i - W] = 1; q[t++] = i - W; }
+      if (i < N - W && !mark[i + W] && d[(i + W) * 4 + 3]) { mark[i + W] = 1; q[t++] = i + W; }
+    }
+    if (t < minArea) for (let j = 0; j < t; j++) d[q[j] * 4 + 3] = 0;
+  }
+  ctx.putImageData(id, 0, 0);
+}
+const hexToRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const rgbToHex = (r, g, b) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+// trova i colori principali del logo (massimo 8)
+function extractPalette(c) {
+  const W = c.width, H = c.height, d = c.getContext('2d').getImageData(0, 0, W, H).data;
+  const step = Math.max(1, Math.floor(Math.sqrt(W * H / 250000)));
+  const buckets = new Map();
+  for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
+    const k = (y * W + x) * 4; if (d[k + 3] < 200) continue;
+    const key = (d[k] >> 3) << 10 | (d[k + 1] >> 3) << 5 | (d[k + 2] >> 3);
+    const b = buckets.get(key); if (b) { b.n++; b.r += d[k]; b.g += d[k + 1]; b.b += d[k + 2]; } else buckets.set(key, { n: 1, r: d[k], g: d[k + 1], b: d[k + 2] });
+  }
+  const total = [...buckets.values()].reduce((s, b) => s + b.n, 0) || 1;
+  const sorted = [...buckets.values()].sort((a, b) => b.n - a.n), out = [];
+  for (const b of sorted) {
+    if (b.n / total < 0.004 || out.length >= 8) break;
+    const rgb = [b.r / b.n, b.g / b.n, b.b / b.n];
+    if (out.some(o => (o[0] - rgb[0]) ** 2 + (o[1] - rgb[1]) ** 2 + (o[2] - rgb[2]) ** 2 < 70 ** 2)) continue;
+    out.push(rgb);
+  }
+  return out.map(o => rgbToHex(...o));
+}
+// cambia i colori: tutto di un colore, oppure ogni colore principale nel nuovo colore scelto
+function recolor(c, a) {
+  const ctx = c.getContext('2d'), id = ctx.getImageData(0, 0, c.width, c.height), d = id.data;
+  const mono = a.mono ? hexToRgb(a.mono) : null;
+  const pal = a.palette.map(hexToRgb), tgt = a.palette.map(h => a.colorMap[h] && a.colorMap[h] !== h ? hexToRgb(a.colorMap[h]) : null);
+  for (let k = 0; k < d.length; k += 4) {
+    if (d[k + 3] === 0) continue;
+    if (mono) { d[k] = mono[0]; d[k + 1] = mono[1]; d[k + 2] = mono[2]; continue; }
+    let bi = -1, bd = 1e9;
+    for (let i = 0; i < pal.length; i++) { const p = pal[i], dd = (d[k] - p[0]) ** 2 + (d[k + 1] - p[1]) ** 2 + (d[k + 2] - p[2]) ** 2; if (dd < bd) { bd = dd; bi = i; } }
+    if (bi < 0 || !tgt[bi] || bd > 90 * 90) continue;
+    const p = pal[bi], t = tgt[bi];
+    for (let j = 0; j < 3; j++) d[k + j] = Math.max(0, Math.min(255, t[j] + d[k + j] - p[j]));
+  }
+  ctx.putImageData(id, 0, 0);
+}
+function loadImage(url) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; }); }
+function readAsDataURL(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
+const A = id => assets.find(a => a.id === id);
+const cm = mm => (Math.round(mm) / 10).toFixed(1).replace('.0', '');
+const busyOn = m => { $('#busyMsg').textContent = m || 'Attendere…'; $('#busy').classList.add('show'); return new Promise(r => setTimeout(r, 60)); };
+const busyOff = () => $('#busy').classList.remove('show');
+
+/* ---------- elementi ---------- */
+async function loadRaw(a) {
+  if (a.type === 'text') await renderText(a);
+  else { const img = await loadImage(a.srcUrl); const c = mk(img.naturalWidth, img.naturalHeight); c.getContext('2d').drawImage(img, 0, 0); a.raw = c; }
+}
+function processAsset(a, keep) {
+  let c = a.raw;
+  if (a.type === 'image') { if (!(a.tol > 0)) a.tol = 40; }
+  if (a.type === 'image' && a.bg !== 'none') { c = mk(a.raw.width, a.raw.height); c.getContext('2d').drawImage(a.raw, 0, 0); removeBackground(c, a.tol, a.bg === 'outer'); }
+  if (a.type === 'image') {
+    a.colorMap = a.colorMap || {};
+    const pk = a.bg + a.tol;
+    if (!a.palette || a._palKey !== pk) { a.palette = extractPalette(c); a._palKey = pk; }
+    if (a.mono || a.palette.some(h => a.colorMap[h] && a.colorMap[h] !== h)) {
+      if (c === a.raw) { c = mk(a.raw.width, a.raw.height); c.getContext('2d').drawImage(a.raw, 0, 0); }
+      recolor(c, a);
+    }
+  }
+  a.canvas = trimCanvas(c);
+  const m = Math.max(a.canvas.width, a.canvas.height);
+  a.thumb = m > 900 ? resizeHQ(a.canvas, a.canvas.width * 900 / m, a.canvas.height * 900 / m) : a.canvas;
+  const asp = a.canvas.height / a.canvas.width;
+  if (keep === 'h') a.w = a.h / asp; else a.h = a.w * asp;
+}
+async function renderText(a) {
+  const lines = (a.text || ' ').split('\n');
+  const need = (a.h || 40) * PXMM / lines.length;
+  const size = Math.max(200, Math.min(1600, Math.round(need * 1.3)));
+  const font = `${a.italic ? 'italic ' : ''}${a.bold ? '700' : '400'} ${size}px "${a.font}", sans-serif`;
+  try { await document.fonts.load(font, a.text || 'A'); } catch (e) {}
+  const m = mk(10, 10).getContext('2d'); m.font = font;
+  let mw = 1; for (const l of lines) mw = Math.max(mw, m.measureText(l).width);
+  const lh = size * 1.2, pad = size * 0.6;
+  const c = mk(mw + pad * 2, lh * lines.length + pad * 2), x = c.getContext('2d');
+  x.font = font; x.fillStyle = a.color; x.textBaseline = 'middle'; x.textAlign = 'center';
+  lines.forEach((l, i) => x.fillText(l, c.width / 2, pad + lh * (i + 0.5)));
+  a.raw = c;
+}
+async function addImageAsset(name, url, bg) {
+  const a = { id: nextId++, type: 'image', name, srcUrl: url, bg, tol: 40, w: 100, h: 100, qty: 1, rot: true };
+  await loadRaw(a);
+  if (bg === 'auto') Object.assign(a, autoBackground(a.raw)); // se ha uno sfondo, lo toglie subito
+  processAsset(a);
+  assets.push(a); return a;
+}
+async function addFiles(files) {
+  files = [...files]; if (!files.length) return;
+  await busyOn('Carico i file…');
+  try {
+    for (const f of files) {
+      const n = f.name.toLowerCase();
+      if (f.type === 'application/pdf' || n.endsWith('.pdf')) {
+        if (!window.pdfjsLib) { alert('Per leggere i PDF serve la connessione a internet.'); continue; }
+        const pdf = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+        const pages = Math.min(pdf.numPages, 20);
+        for (let p = 1; p <= pages; p++) {
+          const page = await pdf.getPage(p), v1 = page.getViewport({ scale: 1 });
+          const longest = Math.max(v1.width, v1.height);
+          const target = Math.min(6000, Math.max(3000, longest * 300 / 72));
+          const vp = page.getViewport({ scale: target / longest });
+          const c = mk(vp.width, vp.height);
+          await page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+          await addImageAsset(f.name.replace(/\.pdf$/i, '') + (pdf.numPages > 1 ? ` (pag. ${p})` : ''), c.toDataURL('image/png'), 'auto');
+        }
+      } else if (/image\/(png|jpeg)/.test(f.type) || /\.(png|jpe?g)$/.test(n)) {
+        await addImageAsset(f.name.replace(/\.(png|jpe?g)$/i, ''), await readAsDataURL(f), 'auto');
+      } else alert('Formato non supportato: ' + f.name + '\nUsa PDF, JPG o PNG.');
+    }
+  } catch (e) { console.error(e); alert('Non sono riuscita a leggere uno dei file. Controlla che non sia rovinato.'); }
+  busyOff(); renderList(); doPack();
+}
+async function addText() {
+  const a = { id: nextId++, type: 'text', name: 'Scritta', text: 'La tua scritta', font: 'Montserrat', color: '#000000', bold: true, italic: false, w: 200, h: 40, qty: 1, rot: true };
+  await loadRaw(a); processAsset(a, 'h');
+  assets.push(a); renderList(); doPack();
+  const ta = document.querySelector(`.card[data-id="${a.id}"] textarea`); if (ta) { ta.focus(); ta.select(); }
+}
+
+/* ---------- lista elementi ---------- */
+function qualityInfo(a) {
+  const usable = S.sheetW - 2 * S.margin;
+  if (a.w > usable && (!a.rot || a.h > usable)) return ['bad', 'Troppo grande per la larghezza del foglio'];
+  const dpi = Math.round(a.canvas.width / (a.w / 25.4));
+  if (a.type === 'text') return ['ok', ''];
+  if (dpi >= 250) return ['ok', `Qualità ottima (${Math.min(dpi, 300)} dpi)`];
+  if (dpi >= 150) return ['warn', `Qualità media (${dpi} dpi): meglio un file più grande`];
+  return ['bad', `Qualità bassa (${dpi} dpi): stampato verrà sgranato`];
+}
+function cardHTML(a) {
+  const text = a.type === 'text' ? `
+    <textarea data-k="text" rows="2">${a.text.replace(/</g, '&lt;')}</textarea>
+    <div class="row">
+      <select data-k="font" style="flex:1">${FONTS.map(f => `<option ${f === a.font ? 'selected' : ''} style="font-family:'${f}'">${f}</option>`).join('')}</select>
+      <input type="color" data-k="color" value="${a.color}" title="Colore">
+      <label class="chk"><input type="checkbox" data-k="bold" ${a.bold ? 'checked' : ''}><b>G</b></label>
+      <label class="chk"><input type="checkbox" data-k="italic" ${a.italic ? 'checked' : ''}><i>C</i></label>
+    </div>` : `
+    <div class="grid2">
+      <label>Sfondo
+        <select data-k="bg">
+          <option value="none" ${a.bg === 'none' ? 'selected' : ''}>Lascialo</option>
+          <option value="outer" ${a.bg === 'outer' ? 'selected' : ''}>Togli quello intorno</option>
+          <option value="all" ${a.bg === 'all' ? 'selected' : ''}>Togli anche quello dentro</option>
+        </select></label>
+      <label title="Più a destra = toglie di più">Quanto togliere<input type="range" data-k="tol" min="5" max="120" value="${a.tol}" ${a.bg === 'none' ? 'disabled' : ''} style="width:100%"></label>
+    </div>
+    <div>
+      <label>Colori del logo: clicca un colore per cambiarlo</label>
+      <div class="row" style="flex-wrap:wrap;margin-top:4px">${a.palette.length ? a.palette.map(h => `<input type="color" data-k="pal" data-from="${h}" value="${a.colorMap[h] || h}" title="Colore originale ${h}" ${a.mono ? 'disabled' : ''}>`).join('') : '<span class="q">Nessun colore trovato</span>'}</div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap">
+        <label class="chk"><input type="checkbox" data-k="monoOn" ${a.mono ? 'checked' : ''}> Tutto di un colore</label>
+        <input type="color" data-k="mono" value="${a.mono || '#000000'}" title="Colore unico">
+        <button class="small" data-k="resetCol">Colori originali</button>
+      </div>
+    </div>`;
+  const q = qualityInfo(a);
+  return `<div class="card" data-id="${a.id}">
+    <div class="top"><canvas class="th" width="108" height="108"></canvas><div class="name">${a.name.replace(/</g, '&lt;')}</div><button class="small" data-k="dup" title="Crea una copia da modificare (es. stessa scritta in un altro colore)">⧉ Duplica</button><button class="del" data-k="del" title="Elimina elemento">✕</button></div>
+    ${text}
+    <div class="grid3">
+      <label>Larghezza (cm)<input type="number" data-k="wcm" min="0.5" step="0.1" value="${cm(a.w)}"></label>
+      <label>Altezza (cm)<input type="number" data-k="hcm" min="0.5" step="0.1" value="${cm(a.h)}"></label>
+      <label>Copie<input type="number" data-k="qty" min="0" step="1" value="${a.qty}"></label>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <label class="chk"><input type="checkbox" data-k="rot" ${a.rot ? 'checked' : ''}> Si può girare</label>
+      <button class="small" data-k="fill" title="Aggiunge copie di questo elemento finché il foglio è pieno (serve la lunghezza fissa)">Riempi il foglio con questo</button>
+    </div>
+    <div class="q ${q[0]}">${q[1]}</div>
+  </div>`;
+}
+function drawThumb(a) {
+  const c = document.querySelector(`.card[data-id="${a.id}"] canvas.th`); if (!c) return;
+  const x = c.getContext('2d'); x.clearRect(0, 0, 108, 108);
+  const s = Math.min(96 / a.thumb.width, 96 / a.thumb.height);
+  x.drawImage(a.thumb, (108 - a.thumb.width * s) / 2, (108 - a.thumb.height * s) / 2, a.thumb.width * s, a.thumb.height * s);
+}
+function renderList() {
+  const l = $('#list');
+  l.innerHTML = assets.length ? assets.map(cardHTML).join('') : '<div class="empty">Ancora nessun elemento.</div>';
+  assets.forEach(drawThumb); markSelectedCard();
+}
+function refreshCard(a) {
+  const c = document.querySelector(`.card[data-id="${a.id}"]`); if (!c) return;
+  const w = c.querySelector('[data-k=wcm]'), h = c.querySelector('[data-k=hcm]');
+  if (document.activeElement !== w) w.value = cm(a.w);
+  if (document.activeElement !== h) h.value = cm(a.h);
+  const q = qualityInfo(a), qe = c.querySelector('.q'); qe.className = 'q ' + q[0]; qe.textContent = q[1];
+  drawThumb(a);
+}
+let packTimer = null, textTimers = {};
+function schedulePack() { clearTimeout(packTimer); packTimer = setTimeout(doPack, 250); }
+function scheduleText(a) {
+  clearTimeout(textTimers[a.id]);
+  textTimers[a.id] = setTimeout(async () => { await renderText(a); processAsset(a, 'h'); refreshCard(a); doPack(); }, 300);
+}
+$('#list').addEventListener('input', e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const a = A(+card.dataset.id), k = e.target.dataset.k, v = e.target.value;
+  const asp = a.canvas.height / a.canvas.width;
+  if (k === 'wcm') { const n = parseFloat(v); if (n > 0) { a.w = n * 10; a.h = a.w * asp; refreshCard(a); if (a.type === 'text') scheduleText(a); else schedulePack(); } }
+  else if (k === 'hcm') { const n = parseFloat(v); if (n > 0) { a.h = n * 10; a.w = a.h / asp; refreshCard(a); if (a.type === 'text') scheduleText(a); else schedulePack(); } }
+  else if (k === 'qty') { a.qty = Math.max(0, parseInt(v) || 0); schedulePack(); }
+  else if (k === 'text') { a.text = v; a.name = (v.split('\n')[0] || 'Scritta').slice(0, 40); card.querySelector('.name').textContent = a.name; scheduleText(a); }
+  else if (k === 'color') { a.color = v; scheduleText(a); }
+});
+$('#list').addEventListener('change', async e => {
+  const card = e.target.closest('.card'); if (!card) return;
+  const a = A(+card.dataset.id), k = e.target.dataset.k;
+  if (k === 'rot') { a.rot = e.target.checked; refreshCard(a); doPack(); }
+  else if (k === 'font' || k === 'bold' || k === 'italic') { a[k] = k === 'font' ? e.target.value : e.target.checked; scheduleText(a); }
+  else if (k === 'bg' || k === 'tol') {
+    a[k] = k === 'tol' ? +e.target.value : e.target.value;
+    await busyOn('Tolgo lo sfondo…'); processAsset(a); busyOff(); renderList(); doPack();
+  }
+  else if (k === 'pal') { a.colorMap[e.target.dataset.from] = e.target.value; await reproc(a); }
+  else if (k === 'monoOn') { a.mono = e.target.checked ? card.querySelector('[data-k=mono]').value : null; await reproc(a); renderList(); }
+  else if (k === 'mono') { a.mono = e.target.value; card.querySelector('[data-k=monoOn]').checked = true; await reproc(a); renderList(); }
+});
+async function reproc(a) { await busyOn('Cambio i colori…'); processAsset(a); busyOff(); refreshCard(a); doPack(); }
+$('#list').addEventListener('click', e => {
+  const b = e.target.closest('button'); const card = e.target.closest('.card'); if (!card) return;
+  const a = A(+card.dataset.id);
+  if (b && b.dataset.k === 'del') { if (confirm(`Eliminare "${a.name}" dal foglio?`)) { assets = assets.filter(x => x !== a); renderList(); doPack(); } }
+  else if (b && b.dataset.k === 'fill') fillWith(a);
+  else if (b && b.dataset.k === 'dup') duplicate(a);
+  else if (b && b.dataset.k === 'resetCol') { a.colorMap = {}; a.mono = null; reproc(a).then(renderList); }
+});
+async function duplicate(a) {
+  const c = Object.fromEntries(KEYS.filter(k => k in a).map(k => [k, a[k]]));
+  c.id = nextId++; c.qty = 1; c.raw = a.raw; c.canvas = a.canvas; c.thumb = a.thumb;
+  c.palette = a.palette; c._palKey = a._palKey; if (a.colorMap) c.colorMap = { ...a.colorMap };
+  assets.splice(assets.indexOf(a) + 1, 0, c);
+  renderList(); doPack();
+  const el = document.querySelector(`.card[data-id="${c.id}"]`);
+  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const t = el.querySelector('textarea'); if (t) { t.focus(); t.select(); } }
+}
+
+/* ---------- incastro automatico (MaxRects) ---------- */
+function splitFree(free, r) {
+  const n = [], E = 1e-6;
+  for (const f of free) {
+    if (r.x >= f.x + f.w - E || r.x + r.w <= f.x + E || r.y >= f.y + f.h - E || r.y + r.h <= f.y + E) { n.push(f); continue; }
+    if (r.x > f.x + E) n.push({ x: f.x, y: f.y, w: r.x - f.x, h: f.h });
+    if (r.x + r.w < f.x + f.w - E) n.push({ x: r.x + r.w, y: f.y, w: f.x + f.w - r.x - r.w, h: f.h });
+    if (r.y > f.y + E) n.push({ x: f.x, y: f.y, w: f.w, h: r.y - f.y });
+    if (r.y + r.h < f.y + f.h - E) n.push({ x: f.x, y: r.y + r.h, w: f.w, h: f.y + f.h - r.y - r.h });
+  }
+  const inside = (a, b) => a.x >= b.x - E && a.y >= b.y - E && a.x + a.w <= b.x + b.w + E && a.y + a.h <= b.y + b.h + E;
+  return n.filter((a, i) => !n.some((b, j) => i !== j && inside(a, b) && (!inside(b, a) || j < i)));
+}
+function packOnce(items, W, H) {
+  let free = [{ x: 0, y: 0, w: W, h: H }]; const out = []; let miss = 0;
+  for (const it of items) {
+    let best = null;
+    for (const f of free) for (const r of (it.rot ? [false, true] : [false])) {
+      const w = r ? it.h : it.w, h = r ? it.w : it.h;
+      if (w <= f.w + 1e-6 && h <= f.h + 1e-6) {
+        const s1 = f.y + h, s2 = f.x;
+        if (!best || s1 < best.s1 - 1e-6 || (Math.abs(s1 - best.s1) < 1e-6 && s2 < best.s2)) best = { x: f.x, y: f.y, w, h, r, s1, s2 };
+      }
+    }
+    if (!best) { miss++; continue; }
+    out.push({ aid: it.aid, x: best.x, y: best.y, w: best.w, h: best.h, r: best.r });
+    free = splitFree(free, best);
+  }
+  return { out, miss };
+}
+const ORDERS = [
+  (a, b) => Math.max(b.w, b.h) - Math.max(a.w, a.h) || b.w * b.h - a.w * a.h || a.aid - b.aid,
+  (a, b) => b.w * b.h - a.w * a.h || a.aid - b.aid,
+  (a, b) => b.h - a.h || b.w - a.w || a.aid - b.aid,
+  (a, b) => b.w - a.w || b.h - a.h || a.aid - b.aid,
+];
+function buildItems(override) {
+  const items = [];
+  for (const a of assets) {
+    const q = override && override.id === a.id ? override.q : a.qty;
+    for (let k = 0; k < q; k++) items.push({ aid: a.id, w: a.w + S.gap, h: a.h + S.gap, rot: a.rot });
+  }
+  return items;
+}
+function bestPack(items) {
+  const W = S.sheetW - 2 * S.margin + S.gap;
+  const H = S.mode === 'fixed' ? S.fixedLen - 2 * S.margin + S.gap : 1e6;
+  let best = null;
+  for (const o of ORDERS) {
+    const r = packOnce(items.slice().sort(o), W, H);
+    r.len = r.out.reduce((m, p) => Math.max(m, p.y + p.h), 0);
+    if (!best || r.miss < best.miss || (r.miss === best.miss && r.len < best.len - 1e-6)) best = r;
+  }
+  return best;
+}
+function doPack() {
+  const r = bestPack(buildItems());
+  placements = r.out.map(p => ({ aid: p.aid, x: p.x + S.margin, y: p.y + S.margin, w: p.w - S.gap, h: p.h - S.gap, r: p.r }));
+  unplaced = r.miss; sel = -1;
+  assets.forEach(refreshCard);
+  draw();
+}
+async function fillWith(a) {
+  if (S.mode !== 'fixed') { alert('Per riempire il foglio, scegli prima "Lunghezza fissa" e scrivi la lunghezza in cm.'); return; }
+  await busyOn('Riempio il foglio…');
+  const ok = q => bestPack(buildItems({ id: a.id, q })).miss === 0;
+  const area = (S.sheetW - 2 * S.margin + S.gap) * (S.fixedLen - 2 * S.margin + S.gap);
+  let lo = 0, hi = Math.ceil(area / ((a.w + S.gap) * (a.h + S.gap))) + 1;
+  if (!ok(0)) { busyOff(); alert('Il foglio è già troppo pieno: gli altri elementi non ci stanno tutti.'); return; }
+  while (lo < hi) { const m = Math.ceil((lo + hi) / 2); if (ok(m)) lo = m; else hi = m - 1; }
+  a.qty = lo; busyOff();
+  const inp = document.querySelector(`.card[data-id="${a.id}"] [data-k=qty]`); if (inp) inp.value = lo;
+  doPack();
+}
+
+/* ---------- anteprima ---------- */
+const cv = $('#sheet');
+let scale = 1;
+function sheetLen() {
+  if (S.mode === 'fixed') return S.fixedLen;
+  const maxY = placements.reduce((m, p) => Math.max(m, p.y + p.h), 0);
+  return maxY ? Math.max(100, Math.ceil((maxY + S.margin) / 10) * 10) : 1000;
+}
+function findBad() {
+  badSet = new Set(); const len = sheetLen();
+  placements.forEach((p, i) => {
+    if (p.x < -0.01 || p.y < -0.01 || p.x + p.w > S.sheetW + 0.01 || p.y + p.h > len + 0.01) badSet.add(i);
+    for (let j = i + 1; j < placements.length; j++) {
+      const q = placements[j];
+      if (p.x < q.x + q.w - 0.01 && q.x < p.x + p.w - 0.01 && p.y < q.y + q.h - 0.01 && q.y < p.y + p.h - 0.01) { badSet.add(i); badSet.add(j); }
+    }
+  });
+}
+let checker = null;
+function draw() {
+  const len = sheetLen(), vp = $('#viewport');
+  scale = Math.max(0.05, (vp.clientWidth - 48) / S.sheetW * zoom);
+  let dpr = window.devicePixelRatio || 1;
+  while (len * scale * dpr > 30000 && dpr > 0.25) dpr /= 2;
+  cv.style.width = S.sheetW * scale + 'px'; cv.style.height = len * scale + 'px';
+  cv.width = Math.round(S.sheetW * scale * dpr); cv.height = Math.round(len * scale * dpr);
+  const x = cv.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  if (bgDark) { x.fillStyle = '#2a2a2f'; x.fillRect(0, 0, cv.width, cv.height); }
+  else {
+    if (!checker) { checker = mk(20, 20); const c = checker.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, 20, 20); c.fillStyle = '#ececec'; c.fillRect(0, 0, 10, 10); c.fillRect(10, 10, 10, 10); }
+    x.fillStyle = x.createPattern(checker, 'repeat'); x.fillRect(0, 0, cv.width, cv.height);
+  }
+  x.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+  const px = 1 / scale;
+  // griglia ogni 10 cm
+  x.strokeStyle = bgDark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.10)'; x.lineWidth = px;
+  x.fillStyle = bgDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.4)'; x.font = `${11 * px}px Poppins, sans-serif`;
+  for (let y = 100; y < len; y += 100) { x.beginPath(); x.moveTo(0, y); x.lineTo(S.sheetW, y); x.stroke(); x.fillText(`${y / 10} cm`, 3 * px, y - 3 * px); }
+  for (let xx = 100; xx < S.sheetW; xx += 100) { x.beginPath(); x.moveTo(xx, 0); x.lineTo(xx, len); x.stroke(); }
+  // margini
+  x.setLineDash([4 * px, 4 * px]); x.strokeStyle = 'rgba(194,65,12,.5)';
+  x.strokeRect(S.margin, S.margin, S.sheetW - 2 * S.margin, len - 2 * S.margin); x.setLineDash([]);
+  findBad();
+  placements.forEach((p, i) => {
+    const a = A(p.aid); if (!a) return;
+    if (!p.r) x.drawImage(a.thumb, p.x, p.y, p.w, p.h);
+    else { x.save(); x.translate(p.x + p.w / 2, p.y + p.h / 2); x.rotate(Math.PI / 2); x.drawImage(a.thumb, -p.h / 2, -p.w / 2, p.h, p.w); x.restore(); }
+    x.lineWidth = (i === sel || badSet.has(i) ? 2 : 1) * px;
+    x.strokeStyle = i === sel ? '#ea580c' : badSet.has(i) ? '#dc2626' : 'rgba(37,99,235,.35)';
+    x.strokeRect(p.x, p.y, p.w, p.h);
+  });
+  updateStats(len);
+}
+function updateStats(len) {
+  const used = placements.reduce((s, p) => s + p.w * p.h, 0);
+  $('#stats').innerHTML = `Foglio <b>${cm(S.sheetW)} × ${cm(len)} cm</b> · <b>${placements.length}</b> pezzi · spazio usato <b>${Math.round(used / (S.sheetW * len) * 100)}%</b>`;
+  const al = $('#alert'); const msgs = [];
+  if (unplaced) msgs.push(`${unplaced} ${unplaced === 1 ? 'copia non ci sta' : 'copie non ci stanno'} nel foglio: allunga il foglio, riduci le misure o le copie.`);
+  if (badSet.size) msgs.push(`Ci sono elementi sovrapposti o fuori dal foglio (bordo rosso): spostali o premi "Sistema automaticamente".`);
+  al.className = 'alert' + (msgs.length ? ' show bad' : '');
+  al.textContent = msgs.join(' ');
+  const sb = $('#selbar');
+  if (sel >= 0 && placements[sel]) { sb.classList.add('show'); $('#selName').textContent = A(placements[sel].aid).name; } else sb.classList.remove('show');
+  markSelectedCard();
+}
+function markSelectedCard() {
+  const aid = sel >= 0 && placements[sel] ? placements[sel].aid : -1;
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', +c.dataset.id === aid));
+}
+
+/* ---------- trascinamento ---------- */
+let drag = null;
+function toMM(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+function hit(m) { for (let i = placements.length - 1; i >= 0; i--) { const p = placements[i]; if (m.x >= p.x && m.x <= p.x + p.w && m.y >= p.y && m.y <= p.y + p.h) return i; } return -1; }
+cv.addEventListener('pointerdown', e => {
+  const m = toMM(e); sel = hit(m);
+  if (sel >= 0) { const p = placements[sel]; drag = { dx: m.x - p.x, dy: m.y - p.y }; cv.setPointerCapture(e.pointerId); }
+  draw();
+});
+cv.addEventListener('pointermove', e => {
+  const m = toMM(e);
+  if (!drag) { cv.style.cursor = hit(m) >= 0 ? 'move' : 'default'; return; }
+  const p = placements[sel];
+  p.x = Math.min(Math.max(0, m.x - drag.dx), S.sheetW - p.w);
+  p.y = Math.max(0, m.y - drag.dy);
+  if (S.mode === 'fixed') p.y = Math.min(p.y, S.fixedLen - p.h);
+  draw();
+});
+cv.addEventListener('pointerup', () => { drag = null; });
+function rotateSel() {
+  const p = placements[sel]; if (!p) return;
+  [p.w, p.h] = [p.h, p.w]; p.r = !p.r;
+  p.x = Math.min(p.x, Math.max(0, S.sheetW - p.w)); draw();
+}
+function deleteSel() {
+  const p = placements[sel]; if (!p) return; const a = A(p.aid);
+  placements.splice(sel, 1); a.qty = Math.max(0, a.qty - 1); sel = -1;
+  const inp = document.querySelector(`.card[data-id="${a.id}"] [data-k=qty]`); if (inp) inp.value = a.qty;
+  draw();
+}
+$('#selRot').onclick = rotateSel; $('#selDel').onclick = deleteSel;
+document.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || sel < 0) return;
+  const p = placements[sel], st = e.shiftKey ? 10 : 1;
+  if (e.key === 'r' || e.key === 'R') rotateSel();
+  else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
+  else if (e.key.startsWith('Arrow')) {
+    e.preventDefault();
+    if (e.key === 'ArrowLeft') p.x = Math.max(0, p.x - st);
+    if (e.key === 'ArrowRight') p.x = Math.min(S.sheetW - p.w, p.x + st);
+    if (e.key === 'ArrowUp') p.y = Math.max(0, p.y - st);
+    if (e.key === 'ArrowDown') p.y += st;
+    draw();
+  } else if (e.key === 'Escape') { sel = -1; draw(); }
+});
+
+/* ---------- esportazione ---------- */
+function bitmaps() {
+  const cache = {};
+  return p => {
+    const k = p.aid + (p.r ? 'r' : '');
+    if (!cache[k]) {
+      const a = A(p.aid);
+      const n = cache[p.aid] || (cache[p.aid] = resizeHQ(a.canvas, a.w * PXMM, a.h * PXMM));
+      if (p.r) cache[k] = rot90(n);
+    }
+    return { img: cache[k], key: k };
+  };
+}
+function preExportCheck() {
+  if (!placements.length) { alert('Il foglio è vuoto.'); return false; }
+  if (badSet.size && !confirm('Ci sono elementi sovrapposti o fuori dal foglio. Esportare comunque?')) return false;
+  if (unplaced && !confirm(`${unplaced} copie non ci stanno nel foglio e non verranno stampate. Esportare comunque?`)) return false;
+  return true;
+}
+function fileName(ext) { return `foglio_${cm(S.sheetW)}x${cm(sheetLen())}cm_300dpi.${ext}`; }
+function download(blob, name) { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function withDpi(buf, dpi) {
+  const src = new Uint8Array(buf);
+  for (let i = 8; i < Math.min(src.length, 200); i++) if (src[i] === 0x70 && src[i + 1] === 0x48 && src[i + 2] === 0x59 && src[i + 3] === 0x73) return src;
+  const ppm = Math.round(dpi / 0.0254), ch = new Uint8Array(21), dv = new DataView(ch.buffer);
+  dv.setUint32(0, 9); ch.set([0x70, 0x48, 0x59, 0x73], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); ch[16] = 1;
+  dv.setUint32(17, crc32(ch.subarray(4, 17)));
+  const out = new Uint8Array(src.length + 21); out.set(src.subarray(0, 33)); out.set(ch, 33); out.set(src.subarray(33), 54);
+  return out;
+}
+async function exportPNG() {
+  draw(); if (!preExportCheck()) return;
+  const len = sheetLen(), W = Math.round(S.sheetW * PXMM), H = Math.round(len * PXMM);
+  if (H > 32000 || W > 32000 || W * H > 260e6) { alert(`Il foglio è troppo lungo per un PNG (massimo circa ${Math.floor(260e6 / W / PXMM / 10)} cm). Usa "Esporta PDF".`); return; }
+  await busyOn('Preparo il PNG a 300 dpi… (può volerci qualche secondo)');
+  try {
+    const c = mk(W, H), x = c.getContext('2d'), get = bitmaps();
+    for (const p of placements) x.drawImage(get(p).img, Math.round(p.x * PXMM), Math.round(p.y * PXMM));
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('memoria');
+    download(new Blob([withDpi(await blob.arrayBuffer(), 300)], { type: 'image/png' }), fileName('png'));
+  } catch (e) { console.error(e); alert('Non sono riuscita a creare il PNG (file troppo grande per il computer). Prova con "Esporta PDF".'); }
+  busyOff();
+}
+async function exportPDF() {
+  draw(); if (!preExportCheck()) return;
+  if (!window.jspdf) { alert('Per creare il PDF serve la connessione a internet.'); return; }
+  await busyOn('Preparo il PDF a misura reale…');
+  try {
+    const len = sheetLen();
+    const doc = new window.jspdf.jsPDF({ unit: 'mm', format: [S.sheetW, len], orientation: len >= S.sheetW ? 'portrait' : 'landscape', compress: true });
+    const get = bitmaps();
+    for (const p of placements) { const b = get(p); doc.addImage(b.img, 'PNG', p.x, p.y, p.w, p.h, 'img' + b.key, 'FAST'); }
+    doc.save(fileName('pdf'));
+  } catch (e) { console.error(e); alert('Non sono riuscita a creare il PDF.'); }
+  busyOff();
+}
+$('#btnPng').onclick = exportPNG; $('#btnPdf').onclick = exportPDF;
+
+/* ---------- salva / apri progetto ---------- */
+const KEYS = ['id', 'type', 'name', 'srcUrl', 'bg', 'tol', 'w', 'h', 'qty', 'rot', 'text', 'font', 'color', 'bold', 'italic', 'colorMap', 'mono'];
+$('#btnSave').onclick = () => {
+  if (!assets.length) { alert('Non c\'è ancora niente da salvare.'); return; }
+  const data = { app: 'foglio-stampe', v: 1, S, assets: assets.map(a => Object.fromEntries(KEYS.filter(k => k in a).map(k => [k, a[k]]))) };
+  const d = new Date(), n = `progetto_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
+  download(new Blob([JSON.stringify(data)], { type: 'application/json' }), n);
+};
+$('#btnOpen').onclick = () => $('#fileProject').click();
+$('#fileProject').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (data.app !== 'foglio-stampe') throw new Error('formato');
+    await busyOn('Apro il progetto…');
+    Object.assign(S, data.S); assets = [];
+    for (const s of data.assets) { const a = { ...s }; await loadRaw(a); processAsset(a, a.type === 'text' ? 'h' : 'w'); assets.push(a); }
+    nextId = Math.max(0, ...assets.map(a => a.id)) + 1;
+    syncSettingsUI(); busyOff(); renderList(); doPack();
+  } catch (err) { busyOff(); console.error(err); alert('Questo file non è un progetto valido di Foglio Stampe.'); }
+};
+
+/* ---------- impostazioni foglio ---------- */
+function syncSettingsUI() {
+  $('#sheetW').value = S.sheetW / 10; $('#fixedLen').value = S.fixedLen / 10; $('#gap').value = S.gap; $('#margin').value = S.margin;
+  document.querySelector(`input[name=mode][value=${S.mode}]`).checked = true;
+  $('#fixedLen').disabled = S.mode !== 'fixed';
+}
+function readSettings() {
+  S.sheetW = Math.max(100, (parseFloat($('#sheetW').value) || 56) * 10);
+  S.fixedLen = Math.max(100, (parseFloat($('#fixedLen').value) || 100) * 10);
+  S.gap = Math.max(0, parseFloat($('#gap').value) || 0);
+  S.margin = Math.max(0, parseFloat($('#margin').value) || 0);
+  S.mode = document.querySelector('input[name=mode]:checked').value;
+  $('#fixedLen').disabled = S.mode !== 'fixed';
+  assets.forEach(refreshCard); schedulePack();
+}
+['#sheetW', '#fixedLen', '#gap', '#margin'].forEach(s => $(s).addEventListener('input', readSettings));
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', readSettings));
+
+/* ---------- pulsanti vari ---------- */
+$('#btnAddFile').onclick = () => $('#fileInput').click();
+$('#fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('#btnAddText').onclick = addText;
+$('#btnPack').onclick = doPack;
+$('#zoomIn').onclick = () => { zoom = Math.min(8, zoom * 1.25); draw(); };
+$('#zoomOut').onclick = () => { zoom = Math.max(0.1, zoom / 1.25); draw(); };
+$('#zoomFit').onclick = () => { zoom = 1; draw(); };
+$('#bgDark').onchange = e => { bgDark = e.target.checked; draw(); };
+window.addEventListener('resize', () => draw());
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
+window.addEventListener('beforeunload', e => { if (assets.length) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- web app: installazione e funzionamento senza internet ---------- */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
+}
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#btnInstall').classList.remove('hidden'); });
+$('#btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $('#btnInstall').classList.add('hidden'); };
+window.addEventListener('appinstalled', () => $('#btnInstall').classList.add('hidden'));
+
+syncSettingsUI();
+draw();
+</script>
+</body>
+</html>

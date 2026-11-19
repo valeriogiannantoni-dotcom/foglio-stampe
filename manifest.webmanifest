@@ -1,0 +1,16 @@
+{
+  "name": "Foglio Stampe",
+  "short_name": "Foglio Stampe",
+  "description": "Prepara fogli di stampa da 56 cm con loghi e scritte, pronti per la tipografia.",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f0ec",
+  "theme_color": "#c2410c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

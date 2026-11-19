@@ -77,6 +77,16 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
 #busy.show{display:flex}
 #busy div{background:#fff;padding:18px 26px;border-radius:12px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25)}
 .hidden{display:none}
+.swrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:6px}
+.swc{width:22px;height:22px;border-radius:6px;border:1px solid rgba(0,0,0,.25);padding:0;cursor:pointer;flex:none}
+.swc:hover{transform:scale(1.15)}
+.swsep{width:1px;height:20px;background:var(--line);margin:0 2px}
+.mine{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:3px 4px 3px 8px;font-size:13px;background:#fff}
+.chip button{border:none;padding:0 4px;color:var(--muted);font-size:14px}
+.chip button:hover{color:var(--bad)}
+.chip .swc{width:18px;height:18px;cursor:default}
+.chip .swc:hover{transform:none}
 </style>
 </head>
 <body>
@@ -132,6 +142,26 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
   </section>
 
   <section>
+    <details id="mineBox">
+      <summary><h2 style="display:inline">I miei font e colori</h2></summary>
+      <label style="margin-top:8px">Font salvati</label>
+      <div class="mine" id="myFonts"></div>
+      <div class="grid2" style="margin-top:6px">
+        <button class="small" id="btnFontFile" title="File di carattere che hai sul computer (TTF, OTF, WOFF)">＋ Font dal computer</button>
+        <button class="small" id="btnFontGoogle" title="Qualsiasi carattere di fonts.google.com, scrivendo il nome">＋ Font da Google Fonts</button>
+      </div>
+      <input type="file" id="fileFont" multiple accept=".ttf,.otf,.woff,.woff2" class="hidden">
+      <label style="margin-top:10px">Colori salvati</label>
+      <div class="mine" id="myColors"></div>
+      <div class="row" style="margin-top:6px">
+        <input type="color" id="newColor" value="#c2410c" list="swList" title="Scegli il colore">
+        <input type="text" id="newColorName" placeholder="Nome (facoltativo)" style="flex:1">
+        <button class="small" id="btnAddColor">＋ Salva colore</button>
+      </div>
+    </details>
+  </section>
+
+  <section>
     <h2>Elementi</h2>
     <div id="list"><div class="empty">Ancora nessun elemento.</div></div>
   </section>
@@ -155,6 +185,7 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
   <div id="viewport"><canvas id="sheet"></canvas></div>
 </main>
 </div>
+<datalist id="swList"></datalist>
 <div id="busy"><div id="busyMsg">Attendere…</div></div>
 
 <script>
@@ -163,7 +194,46 @@ const PXMM = 300 / 25.4;               // pixel per mm a 300 dpi
 const $ = s => document.querySelector(s);
 const S = { sheetW: 560, mode: 'auto', fixedLen: 1000, gap: 5, margin: 5 }; // tutto in mm
 let assets = [], placements = [], unplaced = 0, nextId = 1, sel = -1, zoom = 1, bgDark = false, badSet = new Set();
-const FONTS = ['Montserrat','Poppins','Oswald','Anton','Bebas Neue','Playfair Display','Dancing Script','Pacifico','Great Vibes','Lobster','Arial','Georgia','Times New Roman'];
+// font: i nomi con * si caricano anche in grassetto vero
+const FONT_GROUPS = [
+  ['Semplici', ['Montserrat','Poppins','Roboto*','Open Sans*','Lato*','Raleway*','Nunito*','Inter*','Work Sans*','Quicksand*','Comfortaa*','Ubuntu*','Josefin Sans*','Barlow*']],
+  ['Eleganti, con grazie', ['Playfair Display','Merriweather*','Lora*','Cinzel*','Cormorant Garamond*','Libre Baskerville*','Bodoni Moda*','Abril Fatface','Roboto Slab*','Arvo*','DM Serif Display']],
+  ['Titoli e d\'impatto', ['Oswald','Anton','Bebas Neue','Archivo Black','Alfa Slab One','Bangers','Russo One','Righteous','Fjalla One','Teko*','Staatliches','Bungee','Passion One*','Ultra','Luckiest Guy','Titan One']],
+  ['Corsivi e scritti a mano', ['Dancing Script','Pacifico','Great Vibes','Lobster','Satisfy','Sacramento','Allura','Alex Brush','Parisienne','Kaushan Script','Yellowtail','Courgette','Caveat*','Permanent Marker','Shadows Into Light','Amatic SC*','Indie Flower']],
+  ['Sport, magliette, effetti', ['Graduate','Bowlby One SC','Racing Sans One','Black Ops One','Saira Stencil One','Stardos Stencil*','Allerta Stencil','Orbitron*','Audiowide','Monoton','Press Start 2P','Rye','Creepster']],
+  ['Del computer', ['Arial','Verdana','Impact','Georgia','Times New Roman','Courier New']]
+];
+const PRELOADED = ['Montserrat','Poppins','Oswald','Anton','Bebas Neue','Playfair Display','Dancing Script','Pacifico','Great Vibes','Lobster'];
+FONT_GROUPS.forEach(([g, list], gi) => list.forEach((f, i) => {
+  const name = f.replace('*', '');
+  list[i] = name;
+  if (gi === FONT_GROUPS.length - 1 || PRELOADED.includes(name)) return;
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+') + (f.endsWith('*') ? ':wght@400;700' : '') + '&display=swap';
+  document.head.appendChild(l);
+}));
+// colori pronti, pensati per la stampa
+const BASE_COLORS = [
+  ['#000000','Nero'],['#FFFFFF','Bianco'],['#808080','Grigio'],['#3A3A3A','Grigio scuro'],['#C8102E','Rosso'],['#8B0000','Bordeaux'],
+  ['#FF6A13','Arancione'],['#FFD100','Giallo'],['#C9A227','Oro'],['#A7A9AC','Argento'],['#009A44','Verde'],['#0B5D1E','Verde scuro'],
+  ['#7AC143','Verde chiaro'],['#00A3E0','Azzurro'],['#0057B8','Blu'],['#1B2A4A','Blu notte'],['#6A1B9A','Viola'],['#E5007E','Fucsia'],
+  ['#F7A8C4','Rosa'],['#6D4C41','Marrone'],['#E8D8B8','Beige']
+];
+let myColors = [], myFonts = [];
+try { myColors = JSON.parse(localStorage.getItem('fs-colori') || '[]'); } catch (e) {}
+try { myFonts = JSON.parse(localStorage.getItem('fs-font') || '[]'); } catch (e) {}
+const allFonts = () => [...FONT_GROUPS.flatMap(g => g[1]), ...myFonts.map(f => f.name)];
+function fontOptions(cur) {
+  const opt = f => `<option ${f === cur ? 'selected' : ''} style="font-family:'${f}'">${f}</option>`;
+  let h = myFonts.length ? `<optgroup label="I miei font">${myFonts.map(f => opt(f.name)).join('')}</optgroup>` : '';
+  h += FONT_GROUPS.map(([g, l]) => `<optgroup label="${g}">${l.map(opt).join('')}</optgroup>`).join('');
+  if (cur && !allFonts().includes(cur)) h = `<option selected>${cur}</option>` + h; // font di un progetto che qui non c'è
+  return h;
+}
+function swatches() {
+  const b = ([c, n]) => `<button type="button" class="swc" data-c="${c}" title="${n}" style="background:${c}"></button>`;
+  return BASE_COLORS.map(b).join('') + (myColors.length ? '<span class="swsep"></span>' + myColors.map(b).join('') : '');
+}
 
 if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -396,11 +466,12 @@ function cardHTML(a) {
   const text = a.type === 'text' ? `
     <textarea data-k="text" rows="2">${a.text.replace(/</g, '&lt;')}</textarea>
     <div class="row">
-      <select data-k="font" style="flex:1">${FONTS.map(f => `<option ${f === a.font ? 'selected' : ''} style="font-family:'${f}'">${f}</option>`).join('')}</select>
-      <input type="color" data-k="color" value="${a.color}" title="Colore">
+      <select data-k="font" style="flex:1;font-family:'${a.font}'">${fontOptions(a.font)}</select>
+      <input type="color" data-k="color" value="${a.color}" title="Colore" list="swList">
       <label class="chk"><input type="checkbox" data-k="bold" ${a.bold ? 'checked' : ''}><b>G</b></label>
       <label class="chk"><input type="checkbox" data-k="italic" ${a.italic ? 'checked' : ''}><i>C</i></label>
-    </div>` : `
+    </div>
+    <div class="swrow">${swatches()}<button class="small" data-k="saveCol" title="Aggiunge il colore della scritta ai colori salvati">★ Salva colore</button></div>` : `
     <div class="grid2">
       <label>Sfondo
         <select data-k="bg">
@@ -412,12 +483,13 @@ function cardHTML(a) {
     </div>
     <div>
       <label>Colori del logo: clicca un colore per cambiarlo</label>
-      <div class="row" style="flex-wrap:wrap;margin-top:4px">${a.palette.length ? a.palette.map(h => `<input type="color" data-k="pal" data-from="${h}" value="${a.colorMap[h] || h}" title="Colore originale ${h}" ${a.mono ? 'disabled' : ''}>`).join('') : '<span class="q">Nessun colore trovato</span>'}</div>
+      <div class="row" style="flex-wrap:wrap;margin-top:4px">${a.palette.length ? a.palette.map(h => `<input type="color" data-k="pal" data-from="${h}" value="${a.colorMap[h] || h}" title="Colore originale ${h}" list="swList" ${a.mono ? 'disabled' : ''}>`).join('') : '<span class="q">Nessun colore trovato</span>'}</div>
       <div class="row" style="margin-top:6px;flex-wrap:wrap">
         <label class="chk"><input type="checkbox" data-k="monoOn" ${a.mono ? 'checked' : ''}> Tutto di un colore</label>
-        <input type="color" data-k="mono" value="${a.mono || '#000000'}" title="Colore unico">
+        <input type="color" data-k="mono" value="${a.mono || '#000000'}" title="Colore unico" list="swList">
         <button class="small" data-k="resetCol">Colori originali</button>
       </div>
+      <div class="swrow" title="Clic su un colore: tutto il logo di quel colore">${swatches()}<button class="small" data-k="saveCol" title="Aggiunge il colore unico ai colori salvati">★ Salva colore</button></div>
     </div>`;
   const q = qualityInfo(a);
   return `<div class="card" data-id="${a.id}">
@@ -474,7 +546,7 @@ $('#list').addEventListener('change', async e => {
   const card = e.target.closest('.card'); if (!card) return;
   const a = A(+card.dataset.id), k = e.target.dataset.k;
   if (k === 'rot') { a.rot = e.target.checked; refreshCard(a); doPack(); }
-  else if (k === 'font' || k === 'bold' || k === 'italic') { a[k] = k === 'font' ? e.target.value : e.target.checked; scheduleText(a); }
+  else if (k === 'font' || k === 'bold' || k === 'italic') { a[k] = k === 'font' ? e.target.value : e.target.checked; if (k === 'font') e.target.style.fontFamily = `'${a.font}'`; scheduleText(a); }
   else if (k === 'bg' || k === 'tol') {
     a[k] = k === 'tol' ? +e.target.value : e.target.value;
     await busyOn('Tolgo lo sfondo…'); processAsset(a); busyOff(); renderList(); doPack();
@@ -491,6 +563,12 @@ $('#list').addEventListener('click', e => {
   else if (b && b.dataset.k === 'fill') fillWith(a);
   else if (b && b.dataset.k === 'dup') duplicate(a);
   else if (b && b.dataset.k === 'resetCol') { a.colorMap = {}; a.mono = null; reproc(a).then(renderList); }
+  else if (b && b.dataset.k === 'saveCol') addMyColor(a.type === 'text' ? a.color : card.querySelector('[data-k=mono]').value);
+  else if (b && b.classList.contains('swc')) {
+    const c = b.dataset.c.toLowerCase();
+    if (a.type === 'text') { a.color = c; card.querySelector('[data-k=color]').value = c; scheduleText(a); }
+    else { a.mono = c; reproc(a).then(renderList); }
+  }
 });
 async function duplicate(a) {
   const c = Object.fromEntries(KEYS.filter(k => k in a).map(k => [k, a[k]]));
@@ -794,6 +872,81 @@ function readSettings() {
 }
 ['#sheetW', '#fixedLen', '#gap', '#margin'].forEach(s => $(s).addEventListener('input', readSettings));
 document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', readSettings));
+
+/* ---------- i miei font e colori ---------- */
+function saveMine() {
+  try { localStorage.setItem('fs-colori', JSON.stringify(myColors)); localStorage.setItem('fs-font', JSON.stringify(myFonts)); } catch (e) {}
+}
+function renderMine() {
+  $('#swList').innerHTML = [...BASE_COLORS, ...myColors].map(([c]) => `<option value="${c.toLowerCase()}">`).join('');
+  $('#myColors').innerHTML = myColors.length ? myColors.map(([c, n], i) => `<span class="chip"><span class="swc" style="background:${c}"></span>${(n || c).replace(/</g, '&lt;')}<button data-delc="${i}" title="Togli">✕</button></span>`).join('') : '<span class="q">Nessuno. Ci sono già i colori pronti; qui aggiungi i tuoi.</span>';
+  $('#myFonts').innerHTML = myFonts.length ? myFonts.map((f, i) => `<span class="chip" style="font-family:'${f.name}'">${f.name.replace(/</g, '&lt;')}<button data-delf="${i}" title="Togli">✕</button></span>`).join('') : '<span class="q">Nessuno. Aggiungine uno dal computer o da Google Fonts.</span>';
+}
+function addMyColor(c, n) {
+  c = (c || '').toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(c)) return;
+  if (BASE_COLORS.some(x => x[0] === c) || myColors.some(x => x[0] === c)) { alert('Questo colore c\'è già.'); return; }
+  myColors.push([c, n || '']); saveMine(); renderMine(); renderList();
+}
+$('#btnAddColor').onclick = () => { addMyColor($('#newColor').value, $('#newColorName').value.trim()); $('#newColorName').value = ''; };
+$('#myColors').onclick = e => { const b = e.target.closest('[data-delc]'); if (b) { myColors.splice(+b.dataset.delc, 1); saveMine(); renderMine(); renderList(); } };
+$('#myFonts').onclick = e => {
+  const b = e.target.closest('[data-delf]'); if (!b) return;
+  const f = myFonts[+b.dataset.delf];
+  if (!confirm(`Togliere il font "${f.name}"?`)) return;
+  myFonts.splice(+b.dataset.delf, 1); saveMine(); if (f.file) fontDB('delete', f.name); renderMine(); renderList();
+};
+// i file dei font stanno nel browser (IndexedDB), così restano anche chiudendo l'app
+function fontDB(op, key, val) {
+  return new Promise((ok, ko) => {
+    const r = indexedDB.open('foglio-stampe', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('font');
+    r.onerror = () => ko(r.error);
+    r.onsuccess = () => {
+      const t = r.result.transaction('font', op === 'get' ? 'readonly' : 'readwrite').objectStore('font');
+      const q = op === 'get' ? t.get(key) : op === 'put' ? t.put(val, key) : t.delete(key);
+      q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error);
+    };
+  });
+}
+function googleLink(name) {
+  const l = document.createElement('link'); l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+') + '&display=swap';
+  document.head.appendChild(l);
+}
+async function loadMyFonts() {
+  for (const f of myFonts) {
+    try {
+      if (f.file) { const buf = await fontDB('get', f.name); if (buf) { const ff = new FontFace(f.name, buf); await ff.load(); document.fonts.add(ff); } }
+      else googleLink(f.name);
+    } catch (e) { console.warn('font', f.name, e); }
+  }
+}
+$('#btnFontFile').onclick = () => $('#fileFont').click();
+$('#fileFont').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  for (const file of files) {
+    const name = file.name.replace(/\.(ttf|otf|woff2?)$/i, '').replace(/[-_]+/g, ' ').trim();
+    if (allFonts().includes(name)) { alert(`Il font "${name}" c'è già.`); continue; }
+    try {
+      const buf = await file.arrayBuffer(), ff = new FontFace(name, buf); await ff.load(); document.fonts.add(ff);
+      await fontDB('put', name, buf); myFonts.push({ name, file: true });
+    } catch (err) { console.error(err); alert(`"${file.name}" non è un file di carattere che riesco a leggere.`); }
+  }
+  saveMine(); renderMine(); renderList();
+};
+$('#btnFontGoogle').onclick = async () => {
+  let name = prompt('Scrivi il nome del carattere come compare su fonts.google.com (es. Rubik, Bitter, Satisfy):');
+  name = (name || '').trim().replace(/\s+/g, ' '); if (!name) return;
+  name = name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  if (allFonts().includes(name)) { alert(`Il font "${name}" c'è già nell'elenco.`); return; }
+  try {
+    const r = await fetch('https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+'));
+    if (!r.ok) throw new Error('nf');
+  } catch (err) { alert(`Non trovo "${name}" su Google Fonts. Controlla il nome (serve anche internet).`); return; }
+  googleLink(name); myFonts.push({ name }); saveMine(); renderMine(); renderList();
+};
+renderMine(); loadMyFonts().then(() => { if (assets.length) renderList(); });
 
 /* ---------- pulsanti vari ---------- */
 $('#btnAddFile').onclick = () => $('#fileInput').click();

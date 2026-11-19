@@ -22,7 +22,7 @@
 html,body{height:100%}
 body{margin:0;font:14px/1.45 "Poppins",system-ui,sans-serif;color:var(--ink);background:var(--bg);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
 header{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
-header h1{font-size:18px;margin:0 auto 0 0;font-weight:700;letter-spacing:.2px}
+header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
 header h1 span{color:var(--accent)}
 .app{display:grid;grid-template-columns:390px 1fr;min-height:0}
 aside{overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:14px 14px 40px}
@@ -89,6 +89,9 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
 .chip .swc:hover{transform:none}
 .hw{font-size:12px;border-radius:8px;padding:6px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .hw:empty{display:none}
+.cost:empty{display:none}
+.cost{color:var(--ink)}
+.fx summary{cursor:pointer;font-size:12px;color:var(--muted)}
 .hw.warn{background:#fdecef;color:#b4235a}
 .hw.ok{color:var(--ok);padding:0}
 #holeBox{position:fixed;inset:0;background:rgba(30,25,20,.55);display:none;align-items:center;justify-content:center;z-index:9}
@@ -97,11 +100,30 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
 #holeBox .wrap{flex:1;min-height:0;overflow:auto;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/16px 16px;border-radius:8px;text-align:center}
 #holeCv{max-width:100%;max-height:62vh;cursor:pointer}
 .leg{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px}
+#dlg{position:fixed;inset:0;background:rgba(30,25,20,.55);display:none;align-items:center;justify-content:center;z-index:9}
+#dlg.show{display:flex}
+#dlg .pan{background:#fff;border-radius:14px;padding:16px;width:min(94vw,560px);max-height:92vh;display:flex;flex-direction:column;gap:10px}
+#dlg.wide .pan{width:min(94vw,960px)}
+#dlgBody{overflow:auto;min-height:0;display:flex;flex-direction:column;gap:8px;font-size:13px}
+#dlgBtns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.iss{display:flex;gap:8px;align-items:center;border-radius:8px;padding:8px 10px}
+.iss.bad{background:#fde8e8;color:var(--bad)} .iss.warn{background:#fff7e6;color:var(--warn)} .iss.ok{background:#e8f6ec;color:var(--ok)}
+.iss span{flex:1}
+.work{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}
+.work.cur{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.work img{width:110px;height:64px;object-fit:contain;background:repeating-conic-gradient(#e5e5e5 0 25%,#fff 0 50%) 0 0/10px 10px;border-radius:6px;flex:none}
+.work .wi{flex:1;min-width:0} .work .wi b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#shirtCv{max-width:100%;touch-action:none;cursor:grab;border-radius:10px}
+.shc{width:26px;height:26px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3);cursor:pointer;padding:0}
+.shc.on{box-shadow:0 0 0 3px var(--accent)}
 </style>
 </head>
 <body>
 <header>
   <h1>Foglio <span>Stampe</span></h1>
+  <button id="workName" class="small" title="Nome del lavoro: clicca per cambiarlo">Nuovo lavoro</button>
+  <span id="saveState" class="q" style="margin-right:auto"></span>
+  <button id="btnWorks" title="Tutti i lavori salvati in questa app">🗂 I miei lavori</button>
   <button id="btnInstall" class="hidden" title="Installa Foglio Stampe sul computer come un programma">⤓ Installa app</button>
   <button id="btnOpen" title="Riapri un progetto salvato">📂 Apri progetto</button>
   <button id="btnSave" title="Salva il lavoro per modificarlo dopo">💾 Salva progetto</button>
@@ -138,6 +160,10 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
     <div class="grid2" style="margin-top:8px">
       <label>Spazio tra elementi (mm)<input type="number" id="gap" min="0" max="50" step="1" value="5"></label>
       <label>Margine dai bordi (mm)<input type="number" id="margin" min="0" max="50" step="1" value="5"></label>
+    </div>
+    <div class="grid2" style="margin-top:8px">
+      <label>Prezzo al metro (€)<input type="number" id="price" min="0" step="0.5" placeholder="es. 15"></label>
+      <label title="Si aggiunge al costo per calcolare il prezzo al cliente">Ricarico (%)<input type="number" id="markup" min="0" step="5" placeholder="es. 100"></label>
     </div>
   </section>
 
@@ -179,7 +205,11 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
 
 <main>
   <div class="toolbar">
+    <button id="btnUndo" title="Annulla (Ctrl+Z)" disabled>↶</button>
+    <button id="btnRedo" title="Ripeti (Ctrl+Y)" disabled>↷</button>
     <button id="btnPack" class="primary">✨ Sistema automaticamente</button>
+    <button id="btnCheck" title="Controlla il foglio prima di stamparlo">✔ Controlla</button>
+    <button id="btnShirt" title="Guarda un elemento su una maglietta">👕 Maglietta</button>
     <button id="zoomOut" title="Riduci">−</button>
     <button id="zoomFit" title="Adatta alla finestra">Adatta</button>
     <button id="zoomIn" title="Ingrandisci">+</button>
@@ -196,6 +226,7 @@ body.dragging .drop{border-color:var(--accent);background:var(--accent-soft)}
 </main>
 </div>
 <datalist id="swList"></datalist>
+<div id="dlg"><div class="pan"><b id="dlgTitle"></b><div id="dlgBody"></div><div id="dlgBtns"></div></div></div>
 <div id="holeBox"><div class="pan">
   <b id="holeTitle">Spazi rimasti colorati</b>
   <div style="font-size:13px">Le parti in <span class="leg" style="background:#ff00c8"></span> <b>fucsia</b> sono rimaste del colore dello sfondo (per esempio dentro le lettere O, A, B, R). <b>Clicca una parte</b> per renderla trasparente; ricliccala per rimetterla. Le parti in <span class="leg" style="background:#22c55e"></span> verde le hai tenute.</div>
@@ -468,11 +499,62 @@ function processAsset(a, keep) {
       recolor(c, a);
     }
   }
-  a.canvas = trimCanvas(c);
+  const t = trimCanvas(c);
+  // contorno e ombra: misure in mm convertite nei pixel dell'immagine
+  const ppm = keep === 'h' ? t.height / Math.max(1, a.h - (a.exH || 0)) : t.width / Math.max(1, a.w - (a.exW || 0));
+  a.canvas = applyEffects(t, a, ppm);
+  a.exW = (a.canvas.width - t.width) / ppm; a.exH = (a.canvas.height - t.height) / ppm;
   const m = Math.max(a.canvas.width, a.canvas.height);
   a.thumb = m > 900 ? resizeHQ(a.canvas, a.canvas.width * 900 / m, a.canvas.height * 900 / m) : a.canvas;
   const asp = a.canvas.height / a.canvas.width;
   if (keep === 'h') a.w = a.h / asp; else a.h = a.w * asp;
+}
+// sagoma del disegno allargata di r pixel, tutta di un colore
+function silhouette(t, r, pad, W, H, color) {
+  const d = mk(W, H), x = d.getContext('2d');
+  if (r > 0.5) {
+    const n = Math.max(12, Math.min(48, Math.round(r * 0.8))), rings = r > 8 ? [1, 0.66, 0.33] : [1];
+    for (const k of rings) for (let i = 0; i < n; i++) { const an = i / n * Math.PI * 2; x.drawImage(t, pad + Math.cos(an) * r * k, pad + Math.sin(an) * r * k); }
+  }
+  x.drawImage(t, pad, pad);
+  x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, W, H);
+  return d;
+}
+function applyEffects(t, a, ppm) {
+  const o = a.outline > 0 ? a.outline * ppm : 0, sh = a.shadow > 0 ? a.shadow * ppm : 0;
+  if (!o && !sh) return t;
+  const pad = Math.ceil(o) + 2, s = Math.ceil(sh), W = t.width + 2 * pad + s, H = t.height + 2 * pad + s;
+  const out = mk(W, H), x = out.getContext('2d');
+  if (sh) x.drawImage(silhouette(t, o, pad, W, H, a.shadowColor || '#000000'), s, s);
+  if (o) x.drawImage(silhouette(t, o, pad, W, H, a.outlineColor || '#ffffff'), 0, 0);
+  x.drawImage(t, pad, pad);
+  return trimCanvas(out);
+}
+// scritta ad arco: arc > 0 curva in su, < 0 curva in giù (gradi)
+function arcText(a, size, font) {
+  const txt = (a.text || ' ').split('\n').join(' '), ch = [...txt];
+  const th = Math.abs(a.arc) * Math.PI / 180, up = a.arc > 0;
+  let sz = size;
+  for (let k = 0; k < 4; k++) {
+    const m = mk(10, 10).getContext('2d'); m.font = font.replace(`${size}px`, `${sz}px`);
+    const ws = ch.map(c => m.measureText(c).width), tot = ws.reduce((p, q) => p + q, 0) || 1, R = tot / th;
+    const a0 = up ? -Math.PI / 2 - th / 2 : Math.PI / 2 + th / 2, dir = up ? 1 : -1;
+    let x0 = 1e12, y0 = 1e12, x1 = -1e12, y1 = -1e12;
+    for (let i = 0; i <= 64; i++) for (const rr of [R - sz * 0.8, R + sz * 0.8]) {
+      const an = a0 + dir * th * i / 64, px = Math.cos(an) * rr, py = Math.sin(an) * rr;
+      x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+    }
+    const pad = sz * 0.4, W = x1 - x0 + 2 * pad, H = y1 - y0 + 2 * pad;
+    if (W * H > 60e6 && k < 3) { sz *= Math.sqrt(60e6 / (W * H)) * 0.95; continue; }
+    const c = mk(W, H), x = c.getContext('2d');
+    x.font = m.font; x.fillStyle = a.color; x.textBaseline = 'middle'; x.textAlign = 'center';
+    let acc = 0;
+    ch.forEach((cc, i) => {
+      const an = a0 + dir * (acc + ws[i] / 2) / R; acc += ws[i];
+      x.save(); x.translate(Math.cos(an) * R - x0 + pad, Math.sin(an) * R - y0 + pad); x.rotate(an + dir * Math.PI / 2); x.fillText(cc, 0, 0); x.restore();
+    });
+    return c;
+  }
 }
 async function renderText(a) {
   const lines = (a.text || ' ').split('\n');
@@ -480,6 +562,7 @@ async function renderText(a) {
   const size = Math.max(200, Math.min(1600, Math.round(need * 1.3)));
   const font = `${a.italic ? 'italic ' : ''}${a.bold ? '700' : '400'} ${size}px "${a.font}", sans-serif`;
   try { await document.fonts.load(font, a.text || 'A'); } catch (e) {}
+  if (Math.abs(a.arc || 0) >= 5) { a.raw = arcText(a, size, font); return; }
   const m = mk(10, 10).getContext('2d'); m.font = font;
   let mw = 1; for (const l of lines) mw = Math.max(mw, m.measureText(l).width);
   const lh = size * 1.2, pad = size * 0.6;
@@ -522,7 +605,7 @@ async function addFiles(files) {
   busyOff(); renderList(); doPack();
 }
 async function addText() {
-  const a = { id: nextId++, type: 'text', name: 'Scritta', text: 'La tua scritta', font: 'Montserrat', color: '#000000', bold: true, italic: false, w: 200, h: 40, qty: 1, rot: true };
+  const a = { id: nextId++, type: 'text', name: 'Scritta', text: 'La tua scritta', font: 'Montserrat', color: '#000000', bold: true, italic: false, w: 200, h: 40, qty: 1, rot: true, arc: 0, outline: 0, outlineColor: '#ffffff', shadow: 0, shadowColor: '#000000' };
   await loadRaw(a); processAsset(a, 'h');
   assets.push(a); renderList(); doPack();
   const ta = document.querySelector(`.card[data-id="${a.id}"] textarea`); if (ta) { ta.focus(); ta.select(); }
@@ -547,7 +630,8 @@ function cardHTML(a) {
       <label class="chk"><input type="checkbox" data-k="bold" ${a.bold ? 'checked' : ''}><b>G</b></label>
       <label class="chk"><input type="checkbox" data-k="italic" ${a.italic ? 'checked' : ''}><i>C</i></label>
     </div>
-    <div class="swrow">${swatches()}<button class="small" data-k="saveCol" title="Aggiunge il colore della scritta ai colori salvati">★ Salva colore</button></div>` : `
+    <div class="swrow">${swatches()}<button class="small" data-k="saveCol" title="Aggiunge il colore della scritta ai colori salvati">★ Salva colore</button></div>
+    <label>Arco <span class="q" data-arcv>${arcLabel(a.arc)}</span><input type="range" data-k="arc" min="-180" max="180" step="5" value="${a.arc || 0}" style="width:100%" title="A destra curva in su, a sinistra curva in giù"></label>` : `
     <div class="grid2">
       <label>Sfondo
         <select data-k="bg">
@@ -580,8 +664,16 @@ function cardHTML(a) {
       <label class="chk"><input type="checkbox" data-k="rot" ${a.rot ? 'checked' : ''}> Si può girare</label>
       <button class="small" data-k="fill" title="Aggiunge copie di questo elemento finché il foglio è pieno (serve la lunghezza fissa)">Riempi il foglio con questo</button>
     </div>
-    <div class="q ${q[0]}">${q[1]}</div>
+    <details class="fx" ${a.outline > 0 || a.shadow > 0 ? 'open' : ''}><summary>Contorno e ombra${a.outline > 0 || a.shadow > 0 ? ' ●' : ''}</summary>
+      <div class="grid2" style="margin-top:6px">
+        <label>Contorno (mm, 0 = no)<div class="row"><input type="number" data-k="outline" min="0" max="20" step="0.5" value="${a.outline || 0}"><input type="color" data-k="outlineColor" value="${a.outlineColor || '#ffffff'}" list="swList" title="Colore del contorno"></div></label>
+        <label>Ombra (mm, 0 = no)<div class="row"><input type="number" data-k="shadow" min="0" max="20" step="0.5" value="${a.shadow || 0}"><input type="color" data-k="shadowColor" value="${a.shadowColor || '#000000'}" list="swList" title="Colore dell'ombra"></div></label>
+      </div>
+    </details>
+    <div class="q qual ${q[0]}">${q[1]}</div>
+    <div class="q cost" data-cost></div>
     <div class="${holeClass(a)}">${holeHTML(a)}</div>
+    <div class="row" style="flex-wrap:wrap">${a.type === 'text' ? '<button class="small" data-k="serie" title="Tante scritte uguali con nomi o numeri diversi">🔢 Nomi e numeri in serie</button>' : ''}<button class="small" data-k="shirt" title="Guarda come viene su una maglietta">👕 Prova su maglietta</button></div>
   </div>`;
 }
 function drawThumb(a) {
@@ -600,7 +692,7 @@ function refreshCard(a) {
   const w = c.querySelector('[data-k=wcm]'), h = c.querySelector('[data-k=hcm]');
   if (document.activeElement !== w) w.value = cm(a.w);
   if (document.activeElement !== h) h.value = cm(a.h);
-  const q = qualityInfo(a), qe = c.querySelector('.q'); qe.className = 'q ' + q[0]; qe.textContent = q[1];
+  const q = qualityInfo(a), qe = c.querySelector('.qual'); qe.className = 'q qual ' + q[0]; qe.textContent = q[1];
   const hw = c.querySelector('.hw'); if (hw) { hw.className = holeClass(a); hw.innerHTML = holeHTML(a); }
   drawThumb(a);
 }
@@ -619,7 +711,16 @@ $('#list').addEventListener('input', e => {
   else if (k === 'qty') { a.qty = Math.max(0, parseInt(v) || 0); schedulePack(); }
   else if (k === 'text') { a.text = v; a.name = (v.split('\n')[0] || 'Scritta').slice(0, 40); card.querySelector('.name').textContent = a.name; scheduleText(a); }
   else if (k === 'color') { a.color = v; scheduleText(a); }
+  else if (k === 'arc') { a.arc = +v; card.querySelector('[data-arcv]').textContent = arcLabel(a.arc); scheduleText(a); }
+  else if (k === 'outline' || k === 'shadow') { a[k] = Math.max(0, parseFloat(v) || 0); scheduleFx(a); }
+  else if (k === 'outlineColor' || k === 'shadowColor') { a[k] = v; scheduleFx(a); }
 });
+function arcLabel(v) { v = +v || 0; return Math.abs(v) < 5 ? '(dritta)' : v > 0 ? `(in su, ${v}°)` : `(in giù, ${-v}°)`; }
+function scheduleFx(a) {
+  if (a.type === 'text') { scheduleText(a); return; }
+  clearTimeout(textTimers[a.id]);
+  textTimers[a.id] = setTimeout(async () => { await busyOn('Aggiorno…'); processAsset(a); busyOff(); refreshCard(a); doPack(); }, 400);
+}
 $('#list').addEventListener('change', async e => {
   const card = e.target.closest('.card'); if (!card) return;
   const a = A(+card.dataset.id), k = e.target.dataset.k;
@@ -642,6 +743,8 @@ $('#list').addEventListener('click', e => {
   else if (b && b.dataset.k === 'dup') duplicate(a);
   else if (b && b.dataset.k === 'resetCol') { a.colorMap = {}; a.mono = null; reproc(a).then(renderList); }
   else if (b && b.dataset.k === 'holes') openHoles(a);
+  else if (b && b.dataset.k === 'serie') openSerie(a);
+  else if (b && b.dataset.k === 'shirt') openShirt(a);
   else if (b && b.dataset.k === 'saveCol') addMyColor(a.type === 'text' ? a.color : card.querySelector('[data-k=mono]').value);
   else if (b && b.classList.contains('swc')) {
     const c = b.dataset.c.toLowerCase();
@@ -787,6 +890,7 @@ function draw() {
     x.strokeRect(p.x, p.y, p.w, p.h);
   });
   updateStats(len);
+  if (window.changed) changed();
 }
 function updateStats(len) {
   const used = placements.reduce((s, p) => s + p.w * p.h, 0);
@@ -799,6 +903,7 @@ function updateStats(len) {
   const sb = $('#selbar');
   if (sel >= 0 && placements[sel]) { sb.classList.add('show'); $('#selName').textContent = A(placements[sel].aid).name; } else sb.classList.remove('show');
   markSelectedCard();
+  if (window.updateCosts) updateCosts(len);
 }
 function markSelectedCard() {
   const aid = sel >= 0 && placements[sel] ? placements[sel].aid : -1;
@@ -837,7 +942,7 @@ function deleteSel() {
 }
 $('#selRot').onclick = rotateSel; $('#selDel').onclick = deleteSel;
 document.addEventListener('keydown', e => {
-  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || sel < 0) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || sel < 0 || e.ctrlKey || e.metaKey) return;
   const p = placements[sel], st = e.shiftKey ? 10 : 1;
   if (e.key === 'r' || e.key === 'R') rotateSel();
   else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
@@ -864,14 +969,6 @@ function bitmaps() {
     return { img: cache[k], key: k };
   };
 }
-function preExportCheck() {
-  if (!placements.length) { alert('Il foglio è vuoto.'); return false; }
-  const left = assets.filter(a => a.qty > 0 && a.holeInfo && a.holeInfo.open);
-  if (left.length && !confirm(`In ${left.map(a => '"' + a.name + '"').join(', ')} ci sono parti rimaste del colore dello sfondo (per esempio dentro le lettere): verrebbero stampate.\n\nOK = esporta lo stesso · Annulla = torna indietro e premi "Controlla" sull'elemento`)) return false;
-  if (badSet.size && !confirm('Ci sono elementi sovrapposti o fuori dal foglio. Esportare comunque?')) return false;
-  if (unplaced && !confirm(`${unplaced} copie non ci stanno nel foglio e non verranno stampate. Esportare comunque?`)) return false;
-  return true;
-}
 function fileName(ext) { return `foglio_${cm(S.sheetW)}x${cm(sheetLen())}cm_300dpi.${ext}`; }
 function download(blob, name) { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = name; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); }
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -886,7 +983,7 @@ function withDpi(buf, dpi) {
   return out;
 }
 async function exportPNG() {
-  draw(); if (!preExportCheck()) return;
+  draw(); if (!(await preExportCheck())) return;
   const len = sheetLen(), W = Math.round(S.sheetW * PXMM), H = Math.round(len * PXMM);
   if (H > 32000 || W > 32000 || W * H > 260e6) { alert(`Il foglio è troppo lungo per un PNG (massimo circa ${Math.floor(260e6 / W / PXMM / 10)} cm). Usa "Esporta PDF".`); return; }
   await busyOn('Preparo il PNG a 300 dpi… (può volerci qualche secondo)');
@@ -900,7 +997,7 @@ async function exportPNG() {
   busyOff();
 }
 async function exportPDF() {
-  draw(); if (!preExportCheck()) return;
+  draw(); if (!(await preExportCheck())) return;
   if (!window.jspdf) { alert('Per creare il PDF serve la connessione a internet.'); return; }
   await busyOn('Preparo il PDF a misura reale…');
   try {
@@ -915,25 +1012,14 @@ async function exportPDF() {
 $('#btnPng').onclick = exportPNG; $('#btnPdf').onclick = exportPDF;
 
 /* ---------- salva / apri progetto ---------- */
-const KEYS = ['id', 'type', 'name', 'srcUrl', 'bg', 'tol', 'w', 'h', 'qty', 'rot', 'text', 'font', 'color', 'bold', 'italic', 'colorMap', 'mono', 'holesOff', 'holesKeep'];
-$('#btnSave').onclick = () => {
-  if (!assets.length) { alert('Non c\'è ancora niente da salvare.'); return; }
-  const data = { app: 'foglio-stampe', v: 1, S, assets: assets.map(a => Object.fromEntries(KEYS.filter(k => k in a).map(k => [k, a[k]]))) };
-  const d = new Date(), n = `progetto_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`;
-  download(new Blob([JSON.stringify(data)], { type: 'application/json' }), n);
-};
+const KEYS = ['id', 'type', 'name', 'srcUrl', 'bg', 'tol', 'w', 'h', 'qty', 'rot', 'text', 'font', 'color', 'bold', 'italic', 'colorMap', 'mono', 'holesOff', 'holesKeep', 'arc', 'outline', 'outlineColor', 'shadow', 'shadowColor', 'exW', 'exH'];
+$('#btnSave').onclick = () => saveProjectFile();
 $('#btnOpen').onclick = () => $('#fileProject').click();
 $('#fileProject').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    const data = JSON.parse(await f.text());
-    if (data.app !== 'foglio-stampe') throw new Error('formato');
-    await busyOn('Apro il progetto…');
-    Object.assign(S, data.S); assets = [];
-    for (const s of data.assets) { const a = { ...s }; await loadRaw(a); processAsset(a, a.type === 'text' ? 'h' : 'w'); assets.push(a); }
-    nextId = Math.max(0, ...assets.map(a => a.id)) + 1;
-    syncSettingsUI(); busyOff(); renderList(); doPack();
-  } catch (err) { busyOff(); console.error(err); alert('Questo file non è un progetto valido di Foglio Stampe.'); }
+  let data; try { data = JSON.parse(await f.text()); } catch (err) { data = null; }
+  if (!data || data.app !== 'foglio-stampe') { alert('Questo file non è un progetto valido di Foglio Stampe.'); return; }
+  await openAsNewWork(data, f.name.replace(/\.json$/i, ''));
 };
 
 /* ---------- impostazioni foglio ---------- */
@@ -1025,18 +1111,19 @@ $('#myFonts').onclick = e => {
   myFonts.splice(+b.dataset.delf, 1); saveMine(); if (f.file) fontDB('delete', f.name); renderMine(); renderList();
 };
 // i file dei font stanno nel browser (IndexedDB), così restano anche chiudendo l'app
-function fontDB(op, key, val) {
+function idb(store, op, key, val) {
   return new Promise((ok, ko) => {
-    const r = indexedDB.open('foglio-stampe', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('font');
+    const r = indexedDB.open('foglio-stampe', 2);
+    r.onupgradeneeded = () => { for (const n of ['font', 'lavori']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n); };
     r.onerror = () => ko(r.error);
     r.onsuccess = () => {
-      const t = r.result.transaction('font', op === 'get' ? 'readonly' : 'readwrite').objectStore('font');
-      const q = op === 'get' ? t.get(key) : op === 'put' ? t.put(val, key) : t.delete(key);
+      const t = r.result.transaction(store, op === 'get' || op === 'all' ? 'readonly' : 'readwrite').objectStore(store);
+      const q = op === 'get' ? t.get(key) : op === 'all' ? t.getAll() : op === 'put' ? t.put(val, key) : t.delete(key);
       q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error);
     };
   });
 }
+const fontDB = (op, key, val) => idb('font', op, key, val);
 function googleLink(name) {
   const l = document.createElement('link'); l.rel = 'stylesheet';
   l.href = 'https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+') + '&display=swap';
@@ -1091,7 +1178,7 @@ window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; doc
 window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); addFiles(e.dataTransfer.files); });
-window.addEventListener('beforeunload', e => { if (assets.length) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (window.saveNow) saveNow(); if (window.unsaved && unsaved()) { e.preventDefault(); e.returnValue = ''; } });
 
 /* ---------- web app: installazione e funzionamento senza internet ---------- */
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -1104,6 +1191,442 @@ window.addEventListener('appinstalled', () => $('#btnInstall').classList.add('hi
 
 syncSettingsUI();
 draw();
+</script>
+<script>
+'use strict';
+/* =========================================================================
+   Funzioni aggiunte: finestre, annulla/ripeti, lavori salvati, prezzo,
+   nomi in serie, controllo prima di stampare, prova su maglietta
+   ========================================================================= */
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const euro = v => '€ ' + (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
+
+/* ---------- finestra generica ---------- */
+let dlgDone = null;
+function dialog({ title, html, buttons, wide, onOpen }) {
+  if (dlgDone) dlgDone(null);
+  $('#dlgTitle').textContent = title; $('#dlgBody').innerHTML = html;
+  $('#dlgBtns').innerHTML = buttons.map((b, i) => `<button data-i="${i}" class="${b.primary ? 'primary' : ''}">${b.label}</button>`).join('');
+  $('#dlg').className = 'show' + (wide ? ' wide' : '');
+  return new Promise(res => {
+    dlgDone = v => { dlgDone = null; $('#dlg').className = ''; res(v); };
+    $('#dlgBtns').onclick = e => { const b = e.target.closest('button'); if (b) dlgDone(buttons[+b.dataset.i].value); };
+    if (onOpen) onOpen($('#dlgBody'));
+  });
+}
+const closeDialog = v => { if (dlgDone) dlgDone(v); };
+$('#dlg').addEventListener('pointerdown', e => { if (e.target.id === 'dlg') closeDialog(null); });
+
+/* ---------- stato del lavoro (usato da annulla, lavori e file) ---------- */
+function snapAssets() {
+  return assets.map(a => {
+    const o = {};
+    for (const k of KEYS) if (k in a && a[k] !== undefined) {
+      const v = a[k];
+      o[k] = k === 'colorMap' ? { ...v } : Array.isArray(v) ? v.map(x => Array.isArray(x) ? [...x] : x) : v;
+    }
+    return o;
+  });
+}
+function snapshot() {
+  return { app: 'foglio-stampe', v: 2, S: { ...S }, assets: snapAssets(), placements: placements.map(p => ({ ...p })) };
+}
+const stateKey = d => JSON.stringify(d, (k, v) => k === 'srcUrl' ? v.length + ':' + v.slice(-40) : v);
+// le cose che cambiano il disegno di un elemento: se sono uguali non serve rifarlo
+const PROC = ['type', 'bg', 'tol', 'colorMap', 'mono', 'holesOff', 'holesKeep', 'text', 'font', 'color', 'bold', 'italic', 'arc', 'outline', 'outlineColor', 'shadow', 'shadowColor'];
+const procSig = a => JSON.stringify(PROC.map(k => a[k])) + (a.outline > 0 || a.shadow > 0 ? '|' + Math.round(a.w) + 'x' + Math.round(a.h) : '');
+
+let restoring = false;
+async function restoreState(data) {
+  restoring = true;
+  try {
+    Object.assign(S, data.S || {});
+    const old = new Map(assets.map(a => [a.id, a])), out = [];
+    for (const s of data.assets || []) {
+      const a = { ...s }, prev = old.get(a.id);
+      if (prev && prev.srcUrl === a.srcUrl && procSig(prev) === procSig(a)) {
+        for (const k of ['raw', 'canvas', 'thumb', 'palette', '_palKey', '_bgc', 'holeInfo']) a[k] = prev[k];
+      } else {
+        if (prev && prev.type === 'image' && prev.srcUrl === a.srcUrl) { a.raw = prev.raw; a._bgc = prev._bgc; }
+        else await loadRaw(a);
+        processAsset(a, a.type === 'text' ? 'h' : 'w');
+      }
+      a.w = s.w; a.h = s.h;
+      out.push(a);
+    }
+    assets = out;
+    nextId = Math.max(0, ...assets.map(a => a.id)) + 1;
+    syncSettingsUI(); renderList();
+    if (data.placements) {
+      placements = data.placements.filter(p => A(p.aid)).map(p => ({ ...p }));
+      const want = assets.reduce((n, a) => n + a.qty, 0);
+      unplaced = Math.max(0, want - placements.length); sel = -1;
+      assets.forEach(refreshCard); draw();
+    } else doPack();
+  } finally { restoring = false; }
+}
+
+/* ---------- annulla / ripeti ---------- */
+let hist = [], hIdx = -1, recTimer = null;
+function histReset() { const s = snapshot(); hist = [{ s, k: stateKey(s) }]; hIdx = 0; undoUI(); }
+function record() {
+  recTimer = null; if (restoring) return;
+  const s = snapshot(), k = stateKey(s);
+  if (hIdx >= 0 && hist[hIdx].k === k) return;
+  hist = hist.slice(0, hIdx + 1); hist.push({ s, k });
+  if (hist.length > 80) hist.shift();
+  hIdx = hist.length - 1; undoUI(); markDirty();
+}
+function changed() { if (restoring) return; clearTimeout(recTimer); recTimer = setTimeout(record, 350); }
+function undoUI() { $('#btnUndo').disabled = hIdx <= 0; $('#btnRedo').disabled = hIdx >= hist.length - 1; }
+async function goHist(d) {
+  if (recTimer) { clearTimeout(recTimer); record(); }
+  const i = hIdx + d; if (i < 0 || i >= hist.length) return;
+  hIdx = i; await busyOn(d < 0 ? 'Annullo…' : 'Ripeto…');
+  try { await restoreState(hist[i].s); } catch (e) { console.error(e); }
+  busyOff(); undoUI(); markDirty();
+}
+$('#btnUndo').onclick = () => goHist(-1);
+$('#btnRedo').onclick = () => goHist(1);
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); goHist(-1); }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); goHist(1); }
+  else if (k === 's') { e.preventDefault(); saveNow(true); }
+});
+
+/* ---------- font del progetto (così si aprono uguali su un altro computer) ---------- */
+const b64 = buf => { let s = '', u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = t => { const s = atob(t), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+async function usedFonts() {
+  const names = new Set(assets.filter(a => a.type === 'text').map(a => a.font)), out = [];
+  for (const f of myFonts) if (names.has(f.name)) {
+    if (f.file) { try { const buf = await fontDB('get', f.name); if (buf) out.push({ name: f.name, data: b64(buf) }); } catch (e) {} }
+    else out.push({ name: f.name, google: true });
+  }
+  return out;
+}
+async function installFonts(list) {
+  let added = false;
+  for (const f of list || []) {
+    if (allFonts().includes(f.name)) continue;
+    try {
+      if (f.data) { const buf = unb64(f.data), ff = new FontFace(f.name, buf); await ff.load(); document.fonts.add(ff); await fontDB('put', f.name, buf); myFonts.push({ name: f.name, file: true }); }
+      else { googleLink(f.name); myFonts.push({ name: f.name }); }
+      added = true;
+    } catch (e) { console.warn('font progetto', f.name, e); }
+  }
+  if (added) { saveMine(); renderMine(); }
+}
+
+/* ---------- I miei lavori (salvati nel browser) ---------- */
+let work = null, saveTimer = null, dirty = false;
+function unsaved() { return dirty && assets.length > 0; }
+function nowName() { const d = new Date(); return `Lavoro del ${d.toLocaleDateString('it-IT')} ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`; }
+function workUI() {
+  $('#workName').textContent = '📄 ' + (work ? work.name : 'Nuovo lavoro');
+  $('#saveState').textContent = !assets.length ? '' : dirty ? 'Salvataggio…' : '✓ Salvato';
+}
+function markDirty() { dirty = true; workUI(); clearTimeout(saveTimer); saveTimer = setTimeout(() => saveNow(), 1500); }
+function thumbOf() {
+  if (!placements.length) return '';
+  const len = sheetLen(), k = Math.min(240 / S.sheetW, 160 / len), c = mk(S.sheetW * k, len * k), x = c.getContext('2d');
+  placements.forEach(p => {
+    const a = A(p.aid); if (!a) return;
+    if (!p.r) x.drawImage(a.thumb, p.x * k, p.y * k, p.w * k, p.h * k);
+    else { x.save(); x.translate((p.x + p.w / 2) * k, (p.y + p.h / 2) * k); x.rotate(Math.PI / 2); x.drawImage(a.thumb, -p.h * k / 2, -p.w * k / 2, p.h * k, p.w * k); x.restore(); }
+  });
+  return c.toDataURL('image/png');
+}
+async function saveNow(manual) {
+  clearTimeout(saveTimer); saveTimer = null;
+  if (recTimer) { clearTimeout(recTimer); record(); }
+  if (!assets.length) { if (manual) alert('Non c\'è ancora niente da salvare.'); return; }
+  if (!work) work = { id: 'w' + Date.now(), name: nowName(), created: Date.now() };
+  try {
+    const data = snapshot(); data.fonts = await usedFonts();
+    await idb('lavori', 'put', work.id, { id: work.id, name: work.name, created: work.created, updated: Date.now(), thumb: thumbOf(), n: placements.length, data });
+    localStorage.setItem('fs-ultimo', work.id); dirty = false;
+  } catch (e) { console.error(e); $('#saveState').textContent = '⚠ Non salvato (spazio pieno?)'; return; }
+  workUI();
+}
+async function loadWork(id) {
+  const w = await idb('lavori', 'get', id); if (!w) return false;
+  await busyOn('Apro il lavoro…');
+  try { await installFonts(w.data.fonts); assets = []; placements = []; await restoreState(w.data); }
+  catch (e) { console.error(e); busyOff(); alert('Non sono riuscita ad aprire questo lavoro.'); return false; }
+  work = { id: w.id, name: w.name, created: w.created || w.updated }; dirty = false;
+  localStorage.setItem('fs-ultimo', w.id); busyOff(); histReset(); workUI(); return true;
+}
+async function newWork() {
+  if (unsaved()) await saveNow();
+  work = null; assets = []; placements = []; unplaced = 0; sel = -1; dirty = false;
+  localStorage.removeItem('fs-ultimo'); renderList(); draw(); histReset(); workUI();
+}
+async function openAsNewWork(data, name) {
+  if (unsaved()) await saveNow();
+  await busyOn('Apro il progetto…');
+  try { await installFonts(data.fonts); assets = []; placements = []; await restoreState(data); }
+  catch (e) { console.error(e); busyOff(); alert('Questo file non è un progetto valido di Foglio Stampe.'); return; }
+  busyOff(); work = { id: 'w' + Date.now(), name: name || nowName(), created: Date.now() }; histReset(); markDirty();
+}
+async function saveProjectFile() {
+  if (!assets.length) { alert('Non c\'è ancora niente da salvare.'); return; }
+  const data = snapshot(); data.fonts = await usedFonts();
+  const n = (work ? work.name : nowName()).replace(/[\\/:*?"<>|]+/g, '-') + '.json';
+  download(new Blob([JSON.stringify(data)], { type: 'application/json' }), n);
+}
+async function renameWork() {
+  const n = prompt('Nome del lavoro:', work ? work.name : '');
+  if (!n || !n.trim()) return;
+  if (!work) work = { id: 'w' + Date.now(), name: n.trim(), created: Date.now() }; else work.name = n.trim();
+  markDirty();
+}
+$('#workName').onclick = renameWork;
+async function worksDialog() {
+  if (unsaved()) await saveNow();
+  const list = (await idb('lavori', 'all').catch(() => [])).sort((a, b) => b.updated - a.updated);
+  const row = w => `<div class="work ${work && work.id === w.id ? 'cur' : ''}" data-id="${esc(w.id)}">
+      ${w.thumb ? `<img src="${w.thumb}" alt="">` : '<img alt="">'}
+      <div class="wi"><b>${esc(w.name)}</b><span class="q">${new Date(w.updated).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })} · ${w.n || 0} pezzi${work && work.id === w.id ? ' · aperto adesso' : ''}</span></div>
+      <button class="small primary" data-a="open">Apri</button><button class="small" data-a="ren">Rinomina</button><button class="small" data-a="dup">Duplica</button><button class="small" data-a="del" title="Elimina">🗑</button>
+    </div>`;
+  dialog({
+    title: 'I miei lavori', wide: true,
+    html: `<div class="q">I lavori si salvano da soli mentre lavori, su questo computer. Per tenerne una copia altrove usa "💾 Salva progetto".</div>
+      ${list.length ? list.map(row).join('') : '<div class="empty">Nessun lavoro salvato.</div>'}`,
+    buttons: [{ label: '＋ Nuovo lavoro', value: 'new' }, { label: 'Chiudi', primary: true, value: null }],
+    onOpen: body => body.onclick = async e => {
+      const b = e.target.closest('button[data-a]'); if (!b) return;
+      const id = b.closest('.work').dataset.id, w = list.find(x => x.id === id);
+      if (b.dataset.a === 'open') { closeDialog(null); if (!work || work.id !== id) await loadWork(id); }
+      else if (b.dataset.a === 'ren') {
+        const n = prompt('Nome del lavoro:', w.name); if (!n || !n.trim()) return;
+        w.name = n.trim(); await idb('lavori', 'put', id, w); if (work && work.id === id) { work.name = w.name; workUI(); }
+        worksDialog();
+      } else if (b.dataset.a === 'dup') {
+        const c = { ...w, id: 'w' + Date.now(), name: w.name + ' (copia)', created: Date.now(), updated: Date.now() };
+        await idb('lavori', 'put', c.id, c); worksDialog();
+      } else if (b.dataset.a === 'del') {
+        if (!confirm(`Eliminare "${w.name}"? Non si può recuperare.`)) return;
+        await idb('lavori', 'delete', id);
+        if (work && work.id === id) { work = null; dirty = true; localStorage.removeItem('fs-ultimo'); workUI(); }
+        worksDialog();
+      }
+    }
+  }).then(v => { if (v === 'new') newWork(); });
+}
+$('#btnWorks').onclick = worksDialog;
+
+/* ---------- prezzo ---------- */
+const P = { price: parseFloat(localStorage.getItem('fs-prezzo')) || 0, markup: parseFloat(localStorage.getItem('fs-ricarico')) || 0 };
+if (P.price) $('#price').value = P.price;
+if (P.markup) $('#markup').value = P.markup;
+['price', 'markup'].forEach(k => $('#' + k).addEventListener('input', e => {
+  P[k] = Math.max(0, parseFloat(e.target.value) || 0);
+  localStorage.setItem(k === 'price' ? 'fs-prezzo' : 'fs-ricarico', P[k] || ''); draw();
+}));
+function updateCosts(len) {
+  const cards = document.querySelectorAll('.card [data-cost]');
+  if (!P.price) { cards.forEach(c => c.textContent = ''); return; }
+  const sheetCost = len / 1000 * P.price, k = 1 + P.markup / 100;
+  const area = placements.reduce((s, p) => s + (p.w + S.gap) * (p.h + S.gap), 0) || 1;
+  $('#stats').insertAdjacentHTML('beforeend', ` · costo <b>${euro(sheetCost)}</b>${P.markup ? ` · al cliente <b>${euro(sheetCost * k)}</b>` : ''}`);
+  cards.forEach(el => {
+    const a = A(+el.closest('.card').dataset.id); if (!a) return;
+    const n = placements.filter(p => p.aid === a.id).length;
+    if (!n) { el.textContent = ''; return; }
+    const one = sheetCost * (a.w + S.gap) * (a.h + S.gap) / area;
+    el.textContent = `Costo: ${euro(one)} a copia · ${euro(one * n)} per ${n}` + (P.markup ? ` · al cliente ${euro(one * k)} a copia` : '');
+  });
+}
+
+/* ---------- nomi e numeri in serie ---------- */
+function openSerie(tpl) {
+  dialog({
+    title: 'Nomi e numeri in serie',
+    html: `<div>Crea una scritta per ogni riga, con lo stesso carattere, colore, altezza, contorno e arco di "<b>${esc(tpl.name)}</b>".</div>
+      <label>Una scritta per riga (es. ROSSI 10)<textarea id="srList" rows="9" placeholder="ROSSI 10&#10;BIANCHI 7&#10;VERDI 23"></textarea></label>
+      <div class="row" style="flex-wrap:wrap">Numeri da <input type="number" id="srFrom" value="1" style="width:70px"> a <input type="number" id="srTo" value="20" style="width:70px"><button class="small" id="srGen">Scrivi i numeri</button></div>
+      <div class="grid2">
+        <label class="chk"><input type="checkbox" id="srSplit"> Numero sotto il nome (a capo)</label>
+        <label>Copie per ognuna<input type="number" id="srQty" min="1" value="1"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="srUpper" checked> Tutto in MAIUSCOLO</label>`,
+    buttons: [{ label: 'Annulla', value: null }, { label: 'Crea le scritte', primary: true, value: 'ok' }],
+    onOpen: b => { b.querySelector('#srGen').onclick = () => { const f = +b.querySelector('#srFrom').value, t = +b.querySelector('#srTo').value, out = []; for (let i = f; f <= t ? i <= t : i >= t; i += f <= t ? 1 : -1) out.push(i); b.querySelector('#srList').value = out.join('\n'); }; }
+  }).then(async v => {
+    if (v !== 'ok') return;
+    const body = $('#dlgBody');
+    let rows = body.querySelector('#srList').value.split('\n').map(r => r.trim()).filter(Boolean);
+    if (!rows.length) return;
+    const split = body.querySelector('#srSplit').checked, up = body.querySelector('#srUpper').checked, qty = Math.max(1, parseInt(body.querySelector('#srQty').value) || 1);
+    await busyOn(`Creo ${rows.length} scritte…`);
+    let at = assets.indexOf(tpl) + 1;
+    for (let r of rows) {
+      if (up) r = r.toUpperCase();
+      if (split) r = r.replace(/\s+(\d+)\s*$/, '\n$1');
+      const a = { ...Object.fromEntries(KEYS.filter(k => k in tpl).map(k => [k, tpl[k]])), id: nextId++, text: r, name: r.split('\n').join(' ').slice(0, 40), qty, exW: 0, exH: 0 };
+      await loadRaw(a); processAsset(a, 'h'); assets.splice(at++, 0, a);
+    }
+    busyOff(); renderList(); doPack();
+  });
+}
+
+/* ---------- controllo prima di stampare ---------- */
+// tratti più sottili di 0,5 mm (apertura morfologica su una copia piccola)
+function thinFrac(a) {
+  if (a._thin && a._thin.cv === a.canvas && Math.abs(a._thin.w - a.w) < 1) return a._thin.f;
+  let ppm = 8; while (a.w * a.h * ppm * ppm > 2.5e6 && ppm > 3) ppm--;
+  const W = Math.max(2, Math.round(a.w * ppm)), H = Math.max(2, Math.round(a.h * ppm)), N = W * H;
+  const d = resizeHQ(a.canvas, W, H).getContext('2d').getImageData(0, 0, W, H).data;
+  const INF = 1e9, dist = new Float32Array(N), core = new Float32Array(N);
+  let cnt = 0;
+  for (let i = 0; i < N; i++) { const on = d[i * 4 + 3] > 128; dist[i] = on ? INF : 0; if (on) cnt++; }
+  if (!cnt) return 0;
+  const cham = arr => { // distanza (in pixel) con i passi 1 e 1,4
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; if (!arr[i]) continue; let v = arr[i];
+      if (x > 0) v = Math.min(v, arr[i - 1] + 1); if (y > 0) { v = Math.min(v, arr[i - W] + 1); if (x > 0) v = Math.min(v, arr[i - W - 1] + 1.4); if (x < W - 1) v = Math.min(v, arr[i - W + 1] + 1.4); } arr[i] = v; }
+    for (let y = H - 1; y >= 0; y--) for (let x = W - 1; x >= 0; x--) { const i = y * W + x; if (!arr[i]) continue; let v = arr[i];
+      if (x < W - 1) v = Math.min(v, arr[i + 1] + 1); if (y < H - 1) { v = Math.min(v, arr[i + W] + 1); if (x < W - 1) v = Math.min(v, arr[i + W + 1] + 1.4); if (x > 0) v = Math.min(v, arr[i + W - 1] + 1.4); } arr[i] = v; }
+  };
+  // i bordi dell'immagine contano come vuoto
+  for (let x = 0; x < W; x++) { dist[x] = 0; dist[N - W + x] = 0; } for (let y = 0; y < H; y++) { dist[y * W] = 0; dist[y * W + W - 1] = 0; }
+  cham(dist);
+  const r = 0.25 * ppm;
+  for (let i = 0; i < N; i++) core[i] = dist[i] >= r ? 0 : INF;
+  cham(core);
+  let lost = 0;
+  for (let i = 0; i < N; i++) if (d[i * 4 + 3] > 128 && core[i] > r + 0.5) lost++;
+  const f = lost < 15 ? 0 : lost / cnt;
+  a._thin = { cv: a.canvas, w: a.w, f };
+  return f;
+}
+function findIssues() {
+  const L = [];
+  if (!placements.length) L.push(['bad', 'Il foglio è vuoto.']);
+  if (unplaced) L.push(['bad', `${unplaced} ${unplaced === 1 ? 'copia non ci sta' : 'copie non ci stanno'} nel foglio e non verrebbero stampate.`]);
+  if (badSet.size) L.push(['bad', 'Ci sono elementi sovrapposti o fuori dal foglio (bordo rosso).', null, 'pack']);
+  for (const a of assets) {
+    if (!a.qty) continue;
+    const n = `"${esc(a.name)}"`;
+    if (a.type === 'image') {
+      const q = qualityInfo(a);
+      if (q[0] === 'bad') L.push(['bad', `${n}: ${q[1]}.`, a]);
+      else if (q[0] === 'warn') L.push(['warn', `${n}: ${q[1]}.`, a]);
+      if (a.holeInfo && a.holeInfo.open) L.push(['bad', `${n}: sono rimaste parti del colore dello sfondo (es. dentro le lettere).`, a, 'holes']);
+      if (a.bg === 'none' && rawBg(a)) L.push(['warn', `${n}: lo sfondo non è stato tolto e verrà stampato.`, a]);
+    }
+    const f = thinFrac(a);
+    if (f > 0.01) L.push(['warn', `${n}: ci sono tratti più sottili di mezzo millimetro: potrebbero non attaccarsi bene o rompersi. Ingrandisci l'elemento o scegli un carattere più spesso.`, a]);
+    if (a.type === 'text' && a.h < 5) L.push(['warn', `${n}: la scritta è alta meno di 5 mm, sarà difficile da leggere.`, a]);
+  }
+  return L;
+}
+async function checkDialog(forExport) {
+  await busyOn('Controllo il foglio…');
+  let L; try { L = findIssues(); } finally { busyOff(); }
+  if (forExport && !L.length) return true;
+  const html = L.length
+    ? L.map(([t, m, a, act], i) => `<div class="iss ${t}"><span>${t === 'bad' ? '⛔' : '⚠'} ${m}</span>${a || act ? `<button class="small" data-i="${i}">${act === 'holes' ? 'Controlla' : act === 'pack' ? 'Sistema' : 'Vai'}</button>` : ''}</div>`).join('')
+    : '<div class="iss ok"><span>✓ Tutto a posto: il foglio è pronto per la stampa.</span></div>';
+  const v = await dialog({
+    title: forExport ? 'Prima di esportare, controlla' : 'Controllo del foglio', html,
+    buttons: forExport ? [{ label: 'Torna a sistemare', value: false }, { label: 'Esporta lo stesso', primary: !L.some(x => x[0] === 'bad'), value: true }] : [{ label: 'Chiudi', primary: true, value: false }],
+    onOpen: b => b.onclick = e => {
+      const btn = e.target.closest('button[data-i]'); if (!btn) return;
+      const [, , a, act] = L[+btn.dataset.i]; closeDialog(false);
+      if (act === 'holes') openHoles(a);
+      else if (act === 'pack') doPack();
+      else if (a) { const el = document.querySelector(`.card[data-id="${a.id}"]`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('selected'); } }
+    }
+  });
+  return !!v;
+}
+async function preExportCheck() {
+  if (!placements.length) { alert('Il foglio è vuoto.'); return false; }
+  return checkDialog(true);
+}
+$('#btnCheck').onclick = () => checkDialog(false);
+
+/* ---------- prova su maglietta ---------- */
+const SHIRT_COLORS = [['#ffffff', 'Bianca'], ['#1a1a1a', 'Nera'], ['#9ca3af', 'Grigia'], ['#1e2a4a', 'Blu notte'], ['#1d4ed8', 'Blu'], ['#b91c1c', 'Rossa'], ['#15803d', 'Verde'], ['#facc15', 'Gialla'], ['#f472b6', 'Rosa'], ['#7c2d12', 'Marrone']];
+const SIZES = [['XS', 450], ['S', 480], ['M', 510], ['L', 540], ['XL', 570], ['XXL', 600], ['Bimbo 6 anni', 360], ['Bimbo 10 anni', 410]];
+const SPOTS = { petto: [0, 0.2], cuore: [0.2, 0.22], pancia: [0, 0.5] };
+const SH = { color: '#ffffff', size: 540, aid: null, x: 0, y: 0.2, spot: 'petto' };
+function shirtPath(x, C, ox, oy, k) {
+  const P = (u, v) => [ox + u * C * k, oy + v * C * k];
+  x.beginPath();
+  x.moveTo(...P(-0.17, 0));
+  x.quadraticCurveTo(...P(0, 0.2), ...P(0.17, 0));
+  for (const [u, v] of [[0.42, 0.05], [0.74, 0.31], [0.6, 0.47], [0.5, 0.38], [0.5, 1.36], [-0.5, 1.36], [-0.5, 0.38], [-0.6, 0.47], [-0.74, 0.31], [-0.42, 0.05]]) x.lineTo(...P(u, v));
+  x.closePath();
+}
+function drawShirt() {
+  const cvs = $('#shirtCv'); if (!cvs) return;
+  const x = cvs.getContext('2d'), Wc = cvs.width, Hc = cvs.height, C = SH.size;
+  const k = Math.min(Wc / (1.6 * C), Hc / (1.45 * C)), ox = Wc / 2, oy = (Hc - 1.36 * C * k) / 2 + 4;
+  x.clearRect(0, 0, Wc, Hc); x.fillStyle = '#efece8'; x.fillRect(0, 0, Wc, Hc);
+  shirtPath(x, C, ox, oy, k); x.fillStyle = SH.color; x.fill();
+  x.lineWidth = 2; x.strokeStyle = 'rgba(0,0,0,.25)'; x.stroke();
+  // colletto e cuciture
+  x.beginPath(); x.moveTo(ox - 0.17 * C * k, oy); x.quadraticCurveTo(ox, oy + 0.2 * C * k, ox + 0.17 * C * k, oy);
+  x.lineWidth = 0.025 * C * k; x.strokeStyle = 'rgba(0,0,0,.12)'; x.stroke();
+  x.lineWidth = 1; x.setLineDash([4, 4]); x.strokeStyle = 'rgba(0,0,0,.18)';
+  for (const s of [-1, 1]) { x.beginPath(); x.moveTo(ox + s * 0.42 * C * k, oy + 0.05 * C * k); x.lineTo(ox + s * 0.5 * C * k, oy + 0.38 * C * k); x.stroke(); }
+  x.setLineDash([]);
+  const a = A(SH.aid);
+  if (a) {
+    const w = a.w * k, h = a.h * k, cx = ox + SH.x * C * k, ty = oy + SH.y * C * k;
+    x.save(); shirtPath(x, C, ox, oy, k); x.clip(); x.drawImage(a.thumb, cx - w / 2, ty, w, h); x.restore();
+    SH.box = [cx - w / 2, ty, w, h];
+  }
+  x.fillStyle = 'rgba(0,0,0,.55)'; x.font = '13px Poppins, sans-serif';
+  x.fillText(`Maglietta larga ${C / 10} cm${a ? ` · elemento ${cm(a.w)} × ${cm(a.h)} cm, a ${cm(SH.y * C)} cm dal colletto` : ''}`, 10, Hc - 10);
+  SH.k = k; SH.ox = ox; SH.oy = oy;
+}
+function openShirt(a) {
+  if (!assets.length) { alert('Aggiungi prima un logo o una scritta.'); return; }
+  SH.aid = (a || A(SH.aid) || (sel >= 0 && placements[sel] && A(placements[sel].aid)) || assets[0]).id;
+  const ctl = () => `
+    <div class="row" style="flex-wrap:wrap">
+      <label style="flex:1;min-width:180px">Elemento<select id="shEl">${assets.map(x => `<option value="${x.id}" ${x.id === SH.aid ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <label style="min-width:150px">Taglia<select id="shSize">${SIZES.map(([n, w]) => `<option value="${w}" ${w === SH.size ? 'selected' : ''}>${n} (larga ${w / 10} cm)</option>`).join('')}</select></label>
+    </div>
+    <div class="row" style="flex-wrap:wrap">Colore: ${SHIRT_COLORS.map(([c, n]) => `<button class="shc ${c === SH.color ? 'on' : ''}" data-c="${c}" title="${n}" style="background:${c}"></button>`).join('')}<input type="color" id="shCustom" value="${SH.color}" title="Altro colore"></div>
+    <div class="row" style="flex-wrap:wrap">Posizione: <button class="small" data-spot="petto">Petto al centro</button><button class="small" data-spot="cuore">Sul cuore</button><button class="small" data-spot="pancia">Pancia</button><span class="q">…oppure trascina l'elemento</span></div>
+    <div style="text-align:center"><canvas id="shirtCv" width="760" height="620"></canvas></div>
+    <div class="q">Le misure sono quelle vere: se l'elemento sembra troppo grande o piccolo, cambia la larghezza nella sua scheda.</div>`;
+  dialog({
+    title: 'Prova su maglietta', wide: true, html: ctl(), buttons: [{ label: 'Chiudi', primary: true, value: null }],
+    onOpen: b => {
+      drawShirt();
+      b.querySelector('#shEl').onchange = e => { SH.aid = +e.target.value; drawShirt(); };
+      b.querySelector('#shSize').onchange = e => { SH.size = +e.target.value; drawShirt(); };
+      b.querySelector('#shCustom').oninput = e => { SH.color = e.target.value; b.querySelectorAll('.shc').forEach(s => s.classList.remove('on')); drawShirt(); };
+      b.onclick = e => {
+        const c = e.target.closest('.shc'), sp = e.target.closest('[data-spot]');
+        if (c) { SH.color = c.dataset.c; b.querySelectorAll('.shc').forEach(s => s.classList.toggle('on', s === c)); drawShirt(); }
+        if (sp) { [SH.x, SH.y] = SPOTS[sp.dataset.spot]; drawShirt(); }
+      };
+      const cvs = b.querySelector('#shirtCv'); let dr = null;
+      const pt = e => { const r = cvs.getBoundingClientRect(); return [(e.clientX - r.left) * cvs.width / r.width, (e.clientY - r.top) * cvs.height / r.height]; };
+      cvs.onpointerdown = e => { const [px, py] = pt(e), bx = SH.box; if (bx && px >= bx[0] && px <= bx[0] + bx[2] && py >= bx[1] && py <= bx[1] + bx[3]) { dr = [px, py, SH.x, SH.y]; cvs.setPointerCapture(e.pointerId); } };
+      cvs.onpointermove = e => { if (!dr) return; const [px, py] = pt(e), u = SH.size * SH.k; SH.x = dr[2] + (px - dr[0]) / u; SH.y = Math.max(0, dr[3] + (py - dr[1]) / u); drawShirt(); };
+      cvs.onpointerup = () => { dr = null; };
+    }
+  });
+}
+$('#btnShirt').onclick = () => openShirt();
+
+/* ---------- partenza: riapre l'ultimo lavoro ---------- */
+(async () => {
+  const last = localStorage.getItem('fs-ultimo');
+  if (last) { try { await loadWork(last); } catch (e) { console.warn(e); } }
+  if (hIdx < 0) histReset();
+  workUI();
+})();
 </script>
 </body>
 </html>

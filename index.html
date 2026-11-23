@@ -482,13 +482,24 @@ const busyOff = () => $('#busy').classList.remove('show');
 /* ---------- elementi ---------- */
 async function loadRaw(a) {
   if (a.type === 'text') await renderText(a);
-  else { const img = await loadImage(a.srcUrl); const c = mk(img.naturalWidth, img.naturalHeight); c.getContext('2d').drawImage(img, 0, 0); a.raw = c; }
+  else {
+    const img = await loadImage(a.srcUrl); let c = mk(img.naturalWidth, img.naturalHeight); c.getContext('2d').drawImage(img, 0, 0);
+    // immagini enormi: si riducono a una misura che basta comunque per stampare bene (max 16 milioni di pixel, lato max 7000)
+    const W = c.width, H = c.height, k = Math.min(1, 7000 / Math.max(W, H), Math.sqrt(16e6 / (W * H)));
+    if (k < 1) { c = resizeHQ(c, W * k, H * k); a.reduced = [W, H]; } else delete a.reduced;
+    a.raw = c; a._clean = null;
+  }
 }
 function processAsset(a, keep) {
   let c = a.raw;
   if (a.type === 'image') { if (!(a.tol > 0)) a.tol = 40; }
-  if (a.type === 'image' && a.bg !== 'none') { c = mk(a.raw.width, a.raw.height); c.getContext('2d').drawImage(a.raw, 0, 0); removeBackground(c, a.tol, a.bg === 'outer');
-    if (a.bg === 'outer') { const hs = holeScan(c, a).holes; a.holeInfo = { open: hs.filter(h => h.state === 'open').length, keep: hs.filter(h => h.state === 'keep').length, off: hs.filter(h => h.state === 'off').length }; } }
+  const ck = a.type === 'image' ? a.bg + '|' + a.tol + '|' + JSON.stringify(a.holesOff || []) + '|' + JSON.stringify(a.holesKeep || []) + '|' + a.raw.width : '';
+  if (a.type === 'image' && a.bg !== 'none' && a._clean && a._clean.k === ck && a._clean.raw === a.raw) {
+    c = mk(a.raw.width, a.raw.height); c.getContext('2d').drawImage(a._clean.c, 0, 0);
+  } else if (a.type === 'image' && a.bg !== 'none') { c = mk(a.raw.width, a.raw.height); c.getContext('2d').drawImage(a.raw, 0, 0); removeBackground(c, a.tol, a.bg === 'outer');
+    if (a.bg === 'outer') { const hs = holeScan(c, a).holes; a.holeInfo = { open: hs.filter(h => h.state === 'open').length, keep: hs.filter(h => h.state === 'keep').length, off: hs.filter(h => h.state === 'off').length }; }
+    const cc = mk(c.width, c.height); cc.getContext('2d').drawImage(c, 0, 0); a._clean = { k: ck, c: cc, raw: a.raw };
+  }
   if (a.type === 'image' && a.bg !== 'outer') a.holeInfo = null;
   if (a.type === 'image') {
     a.colorMap = a.colorMap || {};
@@ -1267,9 +1278,10 @@ async function restoreState(data) {
     for (const s of data.assets || []) {
       const a = { ...s }, prev = old.get(a.id);
       if (prev && prev.srcUrl === a.srcUrl && procSig(prev) === procSig(a)) {
-        for (const k of ['raw', 'canvas', 'thumb', 'palette', '_palKey', '_bgc', 'holeInfo']) a[k] = prev[k];
+        for (const k of ['raw', 'canvas', 'thumb', 'palette', '_palKey', '_bgc', 'holeInfo', '_clean', 'reduced']) a[k] = prev[k];
       } else {
-        if (prev && prev.type === 'image' && prev.srcUrl === a.srcUrl) { a.raw = prev.raw; a._bgc = prev._bgc; }
+        await new Promise(r => setTimeout(r, 0)); // lascia respirare il browser tra un elemento e l'altro
+        if (prev && prev.type === 'image' && prev.srcUrl === a.srcUrl) { a.raw = prev.raw; a._bgc = prev._bgc; a._clean = prev._clean; a.reduced = prev.reduced; }
         else await loadRaw(a);
         processAsset(a, a.type === 'text' ? 'h' : 'w');
       }
@@ -1684,8 +1696,16 @@ window.addEventListener('unhandledrejection', e => onAppError((e.reason && (e.re
 
 /* ---------- partenza: riapre l'ultimo lavoro ---------- */
 (async () => {
-  const last = localStorage.getItem('fs-ultimo');
-  if (last) { try { await loadWork(last); } catch (e) { console.warn(e); } }
+  const last = localStorage.getItem('fs-ultimo'), stuck = localStorage.getItem('fs-apertura');
+  if (last && stuck === last) {
+    // la volta scorsa l'apertura di questo lavoro non è finita (pagina bloccata): non lo riapro da solo
+    localStorage.removeItem('fs-apertura'); localStorage.removeItem('fs-ultimo');
+    setTimeout(() => alert('L\'ultima volta l\'app si è bloccata mentre apriva il lavoro. Per sicurezza parto da un foglio vuoto: il lavoro è ancora in "🗂 I miei lavori".'), 300);
+  } else if (last) {
+    localStorage.setItem('fs-apertura', last);
+    try { await loadWork(last); } catch (e) { console.warn(e); }
+    localStorage.removeItem('fs-apertura');
+  }
   if (hIdx < 0) histReset();
   workUI(); askPersist();
 })();

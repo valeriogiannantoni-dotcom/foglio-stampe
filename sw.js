@@ -1,6 +1,6 @@
 // Foglio Stampe: fa funzionare l'app anche senza internet.
 // Quando si pubblica una nuova versione, cambiare VERSION.
-const VERSION = 'fs-v6';
+const VERSION = 'fs-v7';
 const CORE = [
   './',
   './index.html',

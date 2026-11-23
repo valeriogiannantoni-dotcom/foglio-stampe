@@ -509,15 +509,37 @@ function processAsset(a, keep) {
   const asp = a.canvas.height / a.canvas.width;
   if (keep === 'h') a.w = a.h / asp; else a.h = a.w * asp;
 }
-// sagoma del disegno allargata di r pixel, tutta di un colore
+// sagoma del disegno allargata di r pixel, tutta di un colore.
+// Usa una "mappa delle distanze" (due passate sull'immagine): veloce anche con loghi molto grandi.
 function silhouette(t, r, pad, W, H, color) {
   const d = mk(W, H), x = d.getContext('2d');
-  if (r > 0.5) {
-    const n = Math.max(12, Math.min(48, Math.round(r * 0.8))), rings = r > 8 ? [1, 0.66, 0.33] : [1];
-    for (const k of rings) for (let i = 0; i < n; i++) { const an = i / n * Math.PI * 2; x.drawImage(t, pad + Math.cos(an) * r * k, pad + Math.sin(an) * r * k); }
-  }
   x.drawImage(t, pad, pad);
-  x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, W, H);
+  const id = x.getImageData(0, 0, W, H), p = id.data, N = W * H, [cr, cg, cb] = hexToRgb(color);
+  if (r > 0.5) {
+    const INF = 1e9, D = new Float32Array(N);
+    for (let i = 0; i < N; i++) D[i] = p[i * 4 + 3] > 127 ? 0 : INF;
+    // passi 1 / 1,4 / 2,2 (maschera 5-7-11): il contorno viene quasi rotondo
+    const a1 = 1, a2 = 1.4, a3 = 2.2;
+    for (let y = 0; y < H; y++) { const o = y * W;
+      for (let xx = 0; xx < W; xx++) { const i = o + xx; let v = D[i]; if (!v) continue;
+        if (xx > 0) v = Math.min(v, D[i - 1] + a1);
+        if (y > 0) { v = Math.min(v, D[i - W] + a1); if (xx > 0) v = Math.min(v, D[i - W - 1] + a2); if (xx < W - 1) v = Math.min(v, D[i - W + 1] + a2);
+          if (xx > 1) v = Math.min(v, D[i - W - 2] + a3); if (xx < W - 2) v = Math.min(v, D[i - W + 2] + a3); }
+        if (y > 1) { if (xx > 0) v = Math.min(v, D[i - 2 * W - 1] + a3); if (xx < W - 1) v = Math.min(v, D[i - 2 * W + 1] + a3); }
+        D[i] = v; } }
+    for (let y = H - 1; y >= 0; y--) { const o = y * W;
+      for (let xx = W - 1; xx >= 0; xx--) { const i = o + xx; let v = D[i]; if (!v) continue;
+        if (xx < W - 1) v = Math.min(v, D[i + 1] + a1);
+        if (y < H - 1) { v = Math.min(v, D[i + W] + a1); if (xx < W - 1) v = Math.min(v, D[i + W + 1] + a2); if (xx > 0) v = Math.min(v, D[i + W - 1] + a2);
+          if (xx < W - 2) v = Math.min(v, D[i + W + 2] + a3); if (xx > 1) v = Math.min(v, D[i + W - 2] + a3); }
+        if (y < H - 2) { if (xx < W - 1) v = Math.min(v, D[i + 2 * W + 1] + a3); if (xx > 0) v = Math.min(v, D[i + 2 * W - 1] + a3); }
+        D[i] = v; } }
+    for (let i = 0; i < N; i++) {
+      const k = i * 4, e = D[i] === 0 ? 255 : Math.max(0, Math.min(255, (r + 0.5 - D[i]) * 255));
+      p[k] = cr; p[k + 1] = cg; p[k + 2] = cb; p[k + 3] = Math.max(p[k + 3], e);
+    }
+  } else for (let i = 0; i < N; i++) { const k = i * 4; p[k] = cr; p[k + 1] = cg; p[k + 2] = cb; }
+  x.putImageData(id, 0, 0);
   return d;
 }
 function applyEffects(t, a, ppm) {
@@ -545,7 +567,7 @@ function arcText(a, size, font) {
       x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
     }
     const pad = sz * 0.4, W = x1 - x0 + 2 * pad, H = y1 - y0 + 2 * pad;
-    if (W * H > 60e6 && k < 3) { sz *= Math.sqrt(60e6 / (W * H)) * 0.95; continue; }
+    if (W * H > 20e6 && k < 3) { sz *= Math.sqrt(20e6 / (W * H)) * 0.95; continue; }
     const c = mk(W, H), x = c.getContext('2d');
     x.font = m.font; x.fillStyle = a.color; x.textBaseline = 'middle'; x.textAlign = 'center';
     let acc = 0;
@@ -1644,6 +1666,21 @@ function openShirt(a) {
   });
 }
 $('#btnShirt').onclick = () => openShirt();
+
+/* ---------- rete di sicurezza: un errore non deve mai lasciare l'app ferma ---------- */
+function onAppError(msg) {
+  try { busyOff(); } catch (e) {}
+  try { restoring = false; } catch (e) {}
+  const L = JSON.parse(localStorage.getItem('fs-errori') || '[]');
+  L.push(new Date().toLocaleString('it-IT') + ' — ' + String(msg).slice(0, 300));
+  localStorage.setItem('fs-errori', JSON.stringify(L.slice(-30)));
+  let t = $('#errToast');
+  if (!t) { t = document.createElement('div'); t.id = 'errToast'; t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:10px 16px;border-radius:10px;z-index:20;font-size:13px;max-width:90vw;box-shadow:0 6px 20px rgba(0,0,0,.25)'; document.body.appendChild(t); }
+  t.textContent = '⚠ Un\'operazione non è riuscita (forse l\'immagine è troppo grande). Il lavoro è salvo: puoi continuare o premere ↶.';
+  clearTimeout(t._h); t.style.display = 'block'; t._h = setTimeout(() => t.style.display = 'none', 7000);
+}
+window.addEventListener('error', e => onAppError(e.message || e.error));
+window.addEventListener('unhandledrejection', e => onAppError((e.reason && (e.reason.message || e.reason)) || 'errore'));
 
 /* ---------- partenza: riapre l'ultimo lavoro ---------- */
 (async () => {
